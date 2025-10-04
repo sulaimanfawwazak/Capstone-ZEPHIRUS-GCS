@@ -196,7 +196,7 @@ export default function Home() {
           </div>
 
           {/* Flight Indicators Section */}
-          <div className='border-t border-gray-700 bg-gray-900/50 backdrop-blur-sm'>
+          <div className='border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm'>
             <div className='p-4'>
               <FlightIndicators
                 roll={(Math.random() - 0.5) * 120}
