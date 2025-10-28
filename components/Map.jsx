@@ -53,7 +53,7 @@ export default function Map({ homeLocation, planeLocation, homeIcon, planeIcon }
   return (
     <MapContainer
       center={[homeLocation.lat, homeLocation.lng]}
-      zoom={16}
+      zoom={18}
       className="w-full h-full"
     >
       <BingHybridLayer />

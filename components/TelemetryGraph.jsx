@@ -20,25 +20,33 @@ export default function TelemetryGraph({ data }) {
   let lines = [];
   switch (selectedGraph) {
     case "Accelerometer":
-      lines = ["ACCEL_X", "ACCEL_Y", "ACCEL_Z"];
+      lines = [
+        { key: "accelX", name: "Accel X", color: "#8884d8" },
+        { key: "accelY", name: "Accel Y", color: "#82ca9d" },
+        { key: "accelZ", name: "Accel Z", color: "#ffc658" }
+      ];
       break;
     case "Gyroscope":
-      lines = ["GYRO_X", "GYRO_Y", "GYRO_Z"];
+      lines = [
+        { key: "gyroX", name: "Gyro X", color: "#8884d8" },
+        { key: "gyroY", name: "Gyro Y", color: "#82ca9d" },
+        { key: "gyroZ", name: "Gyro Z", color: "#ffc658" }
+      ];
       break;
     case "Altitude":
-      lines = ["ALTITUDE"];
+      lines = [{ key: "altitude", name: "Altitude", color: "#00ff00" }];
       break;
     case "Temperature":
-      lines = ["TEMPERATURE"];
+      lines = [{ key: "temperature", name: "Temperature", color: "#ff4444" }];
       break;
     case "Humidity":
-      lines = ["RELATIVE_HUMIDITY"];
+      lines = [{ key: "humidity", name: "Humidity", color: "#4444ff" }];
       break;
     case "Heading":
-      lines = ["HEADING"];
+      lines = [{ key: "heading", name: "Heading", color: "#ffff00" }];
       break;
     case "Ground Speed":
-      lines = ["GROUND_SPEED"];
+      lines = [{ key: "groundSpeed", name: "Ground Speed", color: "#ff00ff" }];
       break;
   }
 
@@ -61,13 +69,26 @@ export default function TelemetryGraph({ data }) {
       <div className="flex-grow">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#eee" />
-            <XAxis dataKey="TIMESTAMP" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#444" />
+            <XAxis 
+              dataKey="timestamp"
+              // tickFormatter={(value) => new Date(value).toLocaleTimeString()}
+            />
             <YAxis />
-            <Tooltip />
+            <Tooltip 
+              // labelFormatter={(value) => new Date(value).toLocaleTimeString()}
+            />
             <Legend />
-            {lines.map((lineKey) => (
-              <Line key={lineKey} type="monotone" dataKey={lineKey} stroke="green" dot={false} strokeWidth={3}/>
+            {lines.map((line) => (
+              <Line 
+                key={line.key} 
+                type="monotone" 
+                dataKey={line.key}
+                stroke={line.color}
+                name={line.name}
+                dot={false}
+                strokeWidth={3}
+              />
             ))}
           </LineChart>
         </ResponsiveContainer>
