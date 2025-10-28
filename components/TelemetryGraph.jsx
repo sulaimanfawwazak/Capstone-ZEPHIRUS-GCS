@@ -43,7 +43,7 @@ export default function TelemetryGraph({ data }) {
       lines = [{ key: "humidity", name: "Humidity", color: "#4444ff" }];
       break;
     case "Heading":
-      lines = [{ key: "heading", name: "Heading", color: "#ffff00" }];
+      lines = [{ key: "heading", name: "Heading", color: "#00ff00" }];
       break;
     case "Ground Speed":
       lines = [{ key: "groundSpeed", name: "Ground Speed", color: "#ff00ff" }];
@@ -88,6 +88,7 @@ export default function TelemetryGraph({ data }) {
                 name={line.name}
                 dot={false}
                 strokeWidth={3}
+                isAnimationActive={false}
               />
             ))}
           </LineChart>
