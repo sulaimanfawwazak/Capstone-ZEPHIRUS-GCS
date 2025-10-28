@@ -15,6 +15,9 @@ wss.on('connection', (ws) => {
       ws.send(data);
       console.log(data)
     }
+    else {
+      console.log('Ignored data:', data);
+    }
   });
 
   ws.on('close', () => {
