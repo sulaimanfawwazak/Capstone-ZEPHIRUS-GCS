@@ -33,9 +33,17 @@ const WS_URL = 'ws://localhost:8080';
 //   { TIMESTAMP: 2, ALTITUDE: 12, TEMPERATURE: 29, RELATIVE_HUMIDITY: 81, ACCEL_X: 0.1, ACCEL_Y: 0.05, ACCEL_Z: 1.02 },
 // ]
 
+const homeLocation = {
+  lat:-7.765199289055551,
+  lng: 110.37247797203575
+};
+
+
 export default function Home() {
   const { data: telemetryData, isConnected, error } = useWebSocket(WS_URL);
   const [telemetryHistory, setTelemetryHistory] = useState([]);
+  const [flightTrail, setFlightTrail] = useState([]);
+  const [isFirstData, setIsFirstData] = useState(true);
   
   // Update history when new data arrives
   useEffect(() => {
@@ -45,13 +53,54 @@ export default function Home() {
         // Keep only last 50 data points for performance
         return newHistory.slice(-50);
       });
-    }
-  }, [telemetryData]);
 
-  const homeLocation = {
-    lat:-7.765199289055551,
-    lng: 110.37247797203575
-  }
+      // Update flight trail - keep ALL positions for entire path
+      setFlightTrail(prev => {
+        const newPosition = [telemetryData.lat, telemetryData.lon];
+        
+        // Only add new position if it's significantly different from last position
+        if (prev.length === 0) {
+          return [newPosition];
+        }
+        
+        const lastPosition = prev[prev.length - 1];
+        const distance = calculateDistance(
+          lastPosition[0], lastPosition[1],
+          newPosition[0], newPosition[1]
+        );
+        
+        // Only add point if it's more than 1 meter away (reduces clutter)
+        if (distance > 1) {
+          return [...prev, newPosition];
+        }
+        
+        return prev;
+      });
+      
+      if (isFirstData) {
+        setIsFirstData(false);
+      }
+    }
+  }, [telemetryData, isFirstData]);
+
+  // Icons for the map
+  const planeIcon = {
+    iconUrl: '/plane-logo-yellow.png',
+    iconSize:     [40, 40], // size of the icon
+    iconAnchor:   [0, 0], // point of the icon which will correspond to marker's location    // shadowAnchor: [4, 62],  // the same for the shadow
+    popupAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
+  };
+  const homeIcon = {
+    iconUrl: '/home-logo.png',
+    iconSize:     [40, 40], // size of the icon
+    iconAnchor:   [0, 0], // point of the icon which will correspond to marker's location    // shadowAnchor: [4, 62],  // the same for the shadow
+    popupAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
+  };
+
+  // Clear flight trail function
+  const handleClearTrail = () => {
+    setFlightTrail([]);
+  };
 
   // Use real data or fallback to defaults
   const currentData = telemetryData || {
@@ -75,19 +124,25 @@ export default function Home() {
     lng: currentData.lon
   };
 
-  // Icons for the map
-  const planeIcon = {
-    iconUrl: '/plane-logo-yellow.png',
-    iconSize:     [40, 40], // size of the icon
-    iconAnchor:   [0, 0], // point of the icon which will correspond to marker's location    // shadowAnchor: [4, 62],  // the same for the shadow
-    popupAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
+  // Calculate distance to home (simple haversine formula)
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
   };
-  const homeIcon = {
-    iconUrl: '/home-logo.png',
-    iconSize:     [40, 40], // size of the icon
-    iconAnchor:   [0, 0], // point of the icon which will correspond to marker's location    // shadowAnchor: [4, 62],  // the same for the shadow
-    popupAnchor:  [0, 0] // point from which the popup should open relative to the iconAnchor
-  };
+
+  const distanceToHome = calculateDistance(
+    currentData.lat, 
+    currentData.lon, 
+    homeLocation.lat, 
+    homeLocation.lng
+  );  
 
   // Status color function
   const getStatusColor = (value, type) => {
@@ -136,6 +191,9 @@ export default function Home() {
               planeLocation={planeLocation}
               homeIcon={homeIcon}
               planeIcon={planeIcon}
+              heading={currentData.heading}
+              flightTrail={flightTrail}
+              onClearTrail={handleClearTrail}
             />
           </div>
 
@@ -199,7 +257,7 @@ export default function Home() {
                 { icon: FaRotate, label: 'Roll', value: `${currentData.roll} °`, color: 'default' },
                 { icon: FaLocationArrow, label: 'Heading', value: `${currentData.heading.toFixed(1)} °`, color: 'default' },
                 { icon: PiShowerFill, label: 'Humidifier', value: `${currentData.hum_status === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
-                { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${currentData.altitude.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
+                { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
               ].map((item, index) => (
                 <div 
                   key={index}
