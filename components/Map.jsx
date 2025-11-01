@@ -103,8 +103,8 @@ function PlaneMarker({ planeLocation, planeIcon, heading, followUAV, onFollowTog
         <div className="text-center">
           <strong>UAV Position</strong><br />
           Heading: {heading}°<br />
-          Lat: {planeLocation.lat.toFixed(6)}<br />
-          Lon: {planeLocation.lon?.toFixed(6) || planeLocation.lng.toFixed(6)}<br />
+          Lat: {planeLocation.lat}<br />
+          Lon: {planeLocation.lon || planeLocation.lng}<br />
           <br />
           <button 
             onClick={onFollowToggle}
@@ -130,7 +130,7 @@ function FlightTrail({ positions }) {
       color="yellow"
       weight={3}
       opacity={0.7}
-      dashArray="10, 10"
+      // dashArray="10, 10"
     />
   );
 }
@@ -198,7 +198,13 @@ export default function Map({
 
       {/* Home Marker */}
       <Marker position={[homeLocation.lat, homeLocation.lng]} icon={homeIconObject}>
-        <Popup>Home Location</Popup>
+        <Popup>
+          <div className="text-center">
+            <strong>Home Location</strong><br />
+            Lat: {homeLocation.lat}<br />
+            Lon: {homeLocation.lon || homeLocation.lng}<br />
+          </div>
+        </Popup>
       </Marker>
 
       {/* Flight Trail */}

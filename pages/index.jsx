@@ -28,11 +28,6 @@ const WS_URL = 'ws://localhost:8080';
 //   lng: 110.37171384759249
 // }
 
-// const sampleData = [
-//   { TIMESTAMP: 1, ALTITUDE: 10, TEMPERATURE: 28, RELATIVE_HUMIDITY: 80, ACCEL_X: 0, ACCEL_Y: 0, ACCEL_Z: 1 },
-//   { TIMESTAMP: 2, ALTITUDE: 12, TEMPERATURE: 29, RELATIVE_HUMIDITY: 81, ACCEL_X: 0.1, ACCEL_Y: 0.05, ACCEL_Z: 1.02 },
-// ]
-
 const homeLocation = {
   lat:-7.765199289055551,
   lng: 110.37247797203575
@@ -229,13 +224,13 @@ export default function Home() {
                 <p className='text-xs text-gray-400'>ALTITUDE</p>
                 <p className='text-lg font-bold text-white'>{currentData.altitude.toFixed(1)}m</p>
               </div>
-              <div className='p-2 text-center rounded-lg bg-gray-700/50'>
-                <p className='text-xs text-gray-400'>SPEED</p>
-                <p className='text-lg font-bold text-white'>{currentData.groundSpeed.toFixed(1)}m/s</p>
-              </div>
+              {/* <div className='p-2 text-center rounded-lg bg-gray-700/50'> */}
+                {/* <p className='text-xs text-gray-400'>SPEED</p> */}
+                {/* <p className='text-lg font-bold text-white'>{currentData.groundSpeed.toFixed(1)}m/s</p> */}
+              {/* </div> */}
               <div className='p-2 text-center rounded-lg bg-gray-700/50'>
                 <p className='text-xs text-gray-400'>SIGNAL</p>
-                <p className='text-lg font-bold text-white'>{currentData.signalStrength.toFixed(1)}%</p>
+                {/* <p className='text-lg font-bold text-white'>{currentData.signalStrength.toFixed(1)}%</p> */}
               </div>
             </div>
           </div>
@@ -249,10 +244,10 @@ export default function Home() {
                 { icon: TbRulerMeasure2, label: 'Altitude', value: `${currentData.altitude.toFixed(1)} m`, color: 'default' },
                 { icon: FaTemperatureHalf, label: 'Temperature', value: `${currentData.temperature.toFixed(1)} °C`, color: 'default' },
                 { icon: IoWaterSharp, label: 'Humidity', value: `${currentData.humidity.toFixed(1)} %`, color: 'default' },
-                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${currentData.groundSpeed.toFixed(1)} m/s`, color: 'default' },
+//                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${currentData.groundSpeed.toFixed(1)} m/s`, color: 'default' },
                 { icon: FaSatellite, label: 'Satellite Count', value: `${currentData.satelliteCount}`, color: 'satellite', valueColor: 'text-white' },
                 { icon: MdSatelliteAlt, label: 'HDOP', value: `${currentData.hdop}`, color: 'satellite', valueColor: 'text-white' },
-                { icon: FaSignal, label: 'Signal Strength', value: `${currentData.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
+//                { icon: FaSignal, label: 'Signal Strength', value: `${currentData.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
                 { icon: FaArrowsAltV, label: 'Pitch', value: `${currentData.pitch} °`, color: 'default' },
                 { icon: FaRotate, label: 'Roll', value: `${currentData.roll} °`, color: 'default' },
                 { icon: FaLocationArrow, label: 'Heading', value: `${currentData.heading.toFixed(1)} °`, color: 'default' },
