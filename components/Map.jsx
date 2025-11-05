@@ -128,8 +128,8 @@ function FlightTrail({ positions }) {
     <Polyline
       positions={positions}
       color="yellow"
-      weight={3}
-      opacity={0.7}
+      weight={5}
+      opacity={1}
       // dashArray="10, 10"
     />
   );
