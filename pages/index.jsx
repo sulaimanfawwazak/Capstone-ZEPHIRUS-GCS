@@ -14,7 +14,9 @@ import { IoLocationSharp, IoWaterSharp, IoHomeSharp } from "react-icons/io5";
 import { TbAntennaBars5, TbRulerMeasure2 } from "react-icons/tb";
 import { RiPinDistanceFill } from "react-icons/ri";
 import { MdSatelliteAlt } from "react-icons/md";
+import { LuServerOff } from "react-icons/lu";
 import { useState, useEffect } from 'react';
+import UAVModel from '@/components/UAVModel';
 
 // load only on client
 const Map = dynamic(() => import("../components/Map"), { ssr: false });
@@ -29,24 +31,50 @@ const WS_URL = 'ws://localhost:8080';
 // }
 
 const homeLocation = {
-  lat:-7.765199289055551,
-  lng: 110.37247797203575
+  // lat:-7.765199289055551,
+  // lng: 110.37247797203575
+  lat: -7.765893863580182,
+  lng: 110.37179784326118
 };
 
 
 export default function Home() {
-  const { data: telemetryData, isConnected, error } = useWebSocket(WS_URL);
+  const { data: telemetryData, isConnected, serverStatus, error } = useWebSocket(WS_URL); 
   const [telemetryHistory, setTelemetryHistory] = useState([]);
   const [flightTrail, setFlightTrail] = useState([]);
   const [isFirstData, setIsFirstData] = useState(true);
+  const [groundSpeed, setGroundSpeed] = useState(0);
   
   // Update history when new data arrives
   useEffect(() => {
     if (telemetryData) {
       setTelemetryHistory(prev => {
         const newHistory = [...prev, telemetryData];
-        // Keep only last 50 data points for performance
-        return newHistory.slice(-50);
+        return newHistory.slice(-50); // Keep only last 50 data points for performance
+      });
+
+      setTelemetryHistory(prev => {
+        if (prev.length > 0) {
+          const prevPoint = prev[prev.length - 1];
+
+          const distance = calculateDistance(
+            prevPoint.lat, prevPoint.lon,
+            telemetryData.lat, telemetryData.lon
+          );
+
+          const timeDelta = parseFloat((telemetryData.timestamp - prevPoint.timestamp) / 1000); // sec
+          console.log("prev", telemetryData.timestamp);
+          console.log("timeDelta", prevPoint.timestamp);
+          console.log("timeDelta", timeDelta);
+          
+          if (timeDelta > 0) {
+            const speed = distance / timeDelta;
+            console.log("speed", speed);
+            setGroundSpeed(speed); // ✅ store properly in state
+          }
+        }
+
+        return prev; // no change to history here
       });
 
       // Update flight trail - keep ALL positions for entire path
@@ -59,10 +87,7 @@ export default function Home() {
         }
         
         const lastPosition = prev[prev.length - 1];
-        const distance = calculateDistance(
-          lastPosition[0], lastPosition[1],
-          newPosition[0], newPosition[1]
-        );
+        const distance = calculateDistance(lastPosition[0], lastPosition[1], newPosition[0], newPosition[1]);
         
         // Only add point if it's more than 1 meter away (reduces clutter)
         if (distance > 1) {
@@ -101,14 +126,14 @@ export default function Home() {
   const currentData = telemetryData || {
     temperature: 20,
     humidity: 80,
-    altitude: 120.4,
-    groundSpeed: 15,
+    altitude: 0,
+    groundSpeed: 0,
     satelliteCount: 8,
     hdop: 0.9,
     signalStrength: 90,
-    pitch: 1,
-    roll: 2,
-    heading: 127,
+    pitch: 0,
+    roll: 0,
+    heading: 0,
     lat: -7.765719073300151,
     lon: 110.37171384759249,
     hum_status: 0
@@ -192,7 +217,7 @@ export default function Home() {
             />
           </div>
 
-          {/* 1/4 of height - Graph */}
+          {/* 1/4 of height - Graph & Attitude */}
           <div className='border-gray-700 h-1/4 bg-gray-800/80 backdrop-blur-sm rounded-t-2xl'>
             <TelemetryGraph data={telemetryHistory}/>
           </div>
@@ -206,61 +231,75 @@ export default function Home() {
             <div className='flex items-center justify-between mb-4'>
               <h1 className='text-2xl font-bold text-white'>ZEPHIRUS</h1>
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r ${
-                isConnected 
+                serverStatus === "CONNECTED"
                   ? "from-green-500 to-green-600" 
-                  : "from-red-500 to-red-600"
+                  : serverStatus === "DISCONNECTED"
+                    ? "from-red-500 to-red-600"
+                    : "from-red-500 to-red-600" // Server off
               }`}>
-                {isConnected 
-                  ? <FaPlaneCircleCheck className='w-6 h-6 text-white'/>
-                  : <FaPlaneCircleXmark className='w-6 h-6 text-white'/>
-                }
-                <span className='text-sm font-semibold text-white'>{isConnected ? "CONNECTED" : "DISCONNECTED"}</span>
+                {serverStatus === "CONNECTED" && <FaPlaneCircleCheck className='w-6 h-6 text-white'/>}
+                {serverStatus === "DISCONNECTED" && <FaPlaneCircleXmark className='w-6 h-6 text-white'/>}
+                {serverStatus === "OFF" && <LuServerOff className='w-6 h-6 text-white'/>}
+                
+                <span className='text-sm font-semibold text-white'>
+                  {serverStatus === "CONNECTED" && "CONNECTED" }
+                  {serverStatus === "DISCONNECTED" && "DISCONNECTED" }
+                  {serverStatus === "OFF" && "SERVER OFF" }
+                </span>
               </div>
             </div>
 
             {/* Quick Status */}
             <div className='grid grid-cols-3 gap-3'>
-              <div className='p-2 text-center rounded-lg bg-gray-700/50'>
+              <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>ALTITUDE</p>
-                <p className='text-lg font-bold text-white'>{currentData.altitude.toFixed(1)}m</p>
+                <p className='text-lg font-bold text-white'>{currentData?.altitude} m</p>
               </div>
-              {/* <div className='p-2 text-center rounded-lg bg-gray-700/50'> */}
-                {/* <p className='text-xs text-gray-400'>SPEED</p> */}
-                {/* <p className='text-lg font-bold text-white'>{currentData.groundSpeed.toFixed(1)}m/s</p> */}
-              {/* </div> */}
-              <div className='p-2 text-center rounded-lg bg-gray-700/50'>
-                <p className='text-xs text-gray-400'>SIGNAL</p>
-                {/* <p className='text-lg font-bold text-white'>{currentData.signalStrength.toFixed(1)}%</p> */}
+              <div className='p-2 text-center rounded-lg bg-gray-600/50'>
+                <p className='text-xs text-gray-400'>SPEED</p>
+                <p className='text-lg font-bold text-white'>{currentData?.groundSpeed} m/s</p>
+              </div>
+              <div className={`p-2 text-center rounded-lg bg-gray-600/50 ${
+                currentData?.signalStrength >= 80
+                ? 'bg-gradient-to-r from-green-500 to-green-600'
+                : currentData?.signalStrength >= 50
+                  ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
+                  : 'bg-gradient-to-r from-red-500 to-red-600'}`}>
+                <p className='text-xs text-white'>SIGNAL</p>
+                <p className='text-lg font-bold text-white'>{currentData?.signalStrength} %</p>
               </div>
             </div>
           </div>
 
           {/* Flight Data Grid */}
           <div className='flex-1 p-4 overflow-y-auto'>
+            <p className='pb-4 text-sm font-semibold text-center text-gray-300'>
+              FULL DATA
+            </p>
             <div className='grid grid-cols-2 gap-3'>
               
               {/* Telemetry Cards */}
               {[
-                { icon: TbRulerMeasure2, label: 'Altitude', value: `${currentData.altitude.toFixed(1)} m`, color: 'default' },
-                { icon: FaTemperatureHalf, label: 'Temperature', value: `${currentData.temperature.toFixed(1)} °C`, color: 'default' },
-                { icon: IoWaterSharp, label: 'Humidity', value: `${currentData.humidity.toFixed(1)} %`, color: 'default' },
-//                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${currentData.groundSpeed.toFixed(1)} m/s`, color: 'default' },
-                { icon: FaSatellite, label: 'Satellite Count', value: `${currentData.satelliteCount}`, color: 'satellite', valueColor: 'text-white' },
-                { icon: MdSatelliteAlt, label: 'HDOP', value: `${currentData.hdop}`, color: 'satellite', valueColor: 'text-white' },
-//                { icon: FaSignal, label: 'Signal Strength', value: `${currentData.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
-                { icon: FaArrowsAltV, label: 'Pitch', value: `${currentData.pitch} °`, color: 'default' },
-                { icon: FaRotate, label: 'Roll', value: `${currentData.roll} °`, color: 'default' },
-                { icon: FaLocationArrow, label: 'Heading', value: `${currentData.heading.toFixed(1)} °`, color: 'default' },
-                { icon: PiShowerFill, label: 'Humidifier', value: `${currentData.hum_status === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
-                { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
+                { icon: TbRulerMeasure2, label: 'Altitude', value: `${currentData?.altitude?.toFixed(1)} m`, color: 'default' },
+                { icon: FaTemperatureHalf, label: 'Temperature', value: `${currentData?.temperature?.toFixed(1)} °C`, color: 'default' },
+                { icon: IoWaterSharp, label: 'Humidity', value: `${currentData?.humidity?.toFixed(1)} %`, color: 'default' },
+                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${currentData?.groundSpeed} m/s`, color: 'default' },
+                { icon: FaSatellite, label: 'Satellite Count', value: `${currentData?.satelliteCount}`, color: 'satellite', valueColor: 'text-white' },
+                { icon: MdSatelliteAlt, label: 'HDOP', value: `${currentData?.hdop}`, color: 'satellite', valueColor: 'text-white' },
+                { icon: FaSignal, label: 'Signal Strength', value: `${currentData?.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
+                { icon: FaArrowsAltV, label: 'Pitch', value: `${currentData?.pitch} °`, color: 'default' },
+                { icon: FaRotate, label: 'Roll', value: `${currentData?.roll} °`, color: 'default' },
+                { icon: FaLocationArrow, label: 'Heading', value: `${currentData?.heading?.toFixed(1)} °`, color: 'default' },
+                { icon: PiShowerFill, label: 'Humidifier', value: `${currentData?.hum_status === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
+                { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome?.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
               ].map((item, index) => (
                 <div 
                   key={index}
                   className={`flex items-center p-3 rounded-xl ${getStatusColor(
-                    item.color === 'signal' ? currentData.signalStrength : 
-                    item.color === 'satellite' ? currentData.satelliteCount : 
+                    item.color === 'signal' ? currentData?.signalStrength : 
+                    item.color === 'satellite' ? currentData?.satelliteCount : 
                     item.value, item.color
-                  )} backdrop-blur-sm border border-gray-600/30 shadow-lg`}
+                  )} backdrop-blur-sm border border-gray-600/50 shadow-lg`}
                 >
                   <item.icon className='flex-shrink-0 w-5 h-5 mr-3 text-white' />
                   <div className='flex-1'>
@@ -271,41 +310,62 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+            </div>
 
               {/* Coordinate Cards */}
-              <div className='flex flex-row w-full gap-4 mt-4 py-7'>
-                <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
-                  <div className='flex items-center mb-2'>
-                    <FaPlaneUp className='w-4 h-4 mr-2 text-blue-400' />
-                    <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
+              <div className='flex flex-col w-full gap-4 mt-4 border-t border-gray-700 py-7'>
+                <p className='text-sm font-semibold text-center text-gray-300'>
+                  COORDINATES
+                </p>
+                <div className='flex flex-row w-full gap-4'>
+                  <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                    <div className='flex items-center mb-2'>
+                      <FaPlaneUp className='w-4 h-4 mr-2 text-blue-400' />
+                      <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
+                    </div>
+                    <div className='space-y-1'>
+                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{currentData.lat}</span></p>
+                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{currentData.lon}</span></p>
+                    </div>
                   </div>
-                  <div className='space-y-1'>
-                    <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{currentData.lat}</span></p>
-                    <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{currentData.lon}</span></p>
+
+                  <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                    <div className='flex items-center mb-2'>
+                      <IoHomeSharp className='w-4 h-4 mr-2 text-green-400' />
+                      <p className='text-sm font-semibold text-gray-300'>Home Position</p>
+                    </div>
+                    <div className='space-y-1'>
+                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{homeLocation.lat}</span></p>
+                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{homeLocation.lng}</span></p>
+                    </div>
                   </div>
                 </div>
 
-                <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
-                  <div className='flex items-center mb-2'>
-                    <IoHomeSharp className='w-4 h-4 mr-2 text-green-400' />
-                    <p className='text-sm font-semibold text-gray-300'>Home Position</p>
-                  </div>
-                  <div className='space-y-1'>
-                    <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{homeLocation.lat}</span></p>
-                    <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{homeLocation.lng}</span></p>
-                  </div>
-                </div>
+
               </div>
-            </div>
+            {/* </div> */}
           </div>
 
           {/* Flight Indicators Section */}
-          <div className='border-t border-gray-700 bg-gray-800/50 backdrop-blur-sm'>
+          <div className='overflow-y-auto border-t border-gray-700 h-1/4 bg-gray-800/50 backdrop-blur-sm'>
+            {/* 3D Attitude */}
+            <div className='pb-4 -mt-12 border-b border-gray-700'>
+              <UAVModel
+                roll={currentData?.roll}
+                pitch={currentData?.pitch}
+                heading={currentData?.heading}
+              />
+              <p className='text-sm font-semibold text-center text-gray-300'>
+                3D ORIENTATION
+              </p>
+            </div>
+
+            {/* Artificial Horizon & Heading */}
             <div className='p-4'>
               <FlightIndicators
-                roll={currentData.roll}
-                pitch={currentData.pitch}
-                heading={currentData.heading}
+                roll={currentData?.roll}
+                pitch={currentData?.pitch}
+                heading={currentData?.heading}
               />
               <p className='mt-2 text-sm font-semibold text-center text-gray-300'>
                 ATTITUDE & HEADING
