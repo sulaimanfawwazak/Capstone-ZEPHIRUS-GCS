@@ -5,7 +5,7 @@ import TelemetryGraph from '@/components/TelemetryGraph';
 import FlightIndicators from '@/components/FlightIndicators';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useFlightRecorder } from '@/hooks/useFlightRecorder';
-import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash, FaCheck, FaEdit } from "react-icons/fa";
+import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash, FaCheck, FaEdit, FaCloudSun, FaSync, FaRobot } from "react-icons/fa";
 import { FaMapLocationDot, FaTemperatureHalf, FaRotate, FaPlaneCircleCheck, FaPlaneCircleXmark, FaPlaneUp } from "react-icons/fa6";
 import { WiHumidity } from "react-icons/wi";
 import { PiShowerFill } from "react-icons/pi";
@@ -22,6 +22,8 @@ import UAVModel from '@/components/UAVModel';
 import RecordingUploader from '@/components/RecordingUploader';
 import { useFlightPlayback } from '@/hooks/useFlightPlayback';
 import { useSpriteAnimator } from '@react-three/drei';
+import { useWeather } from '@/hooks/useWeather';
+import { useFlightAnalysis } from '@/hooks/useFlightAnalysis';
 
 // load only on client
 const Map = dynamic(() => import("../components/Map"), { ssr: false });
@@ -100,6 +102,36 @@ export default function Home() {
     recordingDuration,
     dataPointsCount
   } = useFlightRecorder();
+
+  const { 
+    weatherData, 
+    loading: weatherLoading, 
+    error: weatherError, 
+    fetchWeather, 
+    getWeatherIcon,
+    getFlightConditions 
+  } = useWeather();
+  
+  const { 
+    analysis, 
+    loading: analysisLoading, 
+    error: analysisError, 
+    analyzeFlightConditions 
+  } = useFlightAnalysis();
+
+  // Fetch weather when home location changes
+  useEffect(() => {
+    if (homeLocation.lat && homeLocation.lng) {
+      fetchWeather(homeLocation.lat, homeLocation.lng);
+    }
+  }, [homeLocation, fetchWeather]);
+
+  // Analyze conditions when weather data updates
+  useEffect(() => {
+    if (weatherData) {
+      analyzeFlightConditions(weatherData, currentData);
+    }
+  }, [weatherData, analyzeFlightConditions]);
   
   // Update history when new data arrives
   useEffect(() => {
@@ -331,6 +363,7 @@ export default function Home() {
           {/* Header */}
           <div className='p-6 border-b border-gray-700'>
             <div className='flex items-center justify-between mb-4'>
+              <img src='/ZEPHIRUS-white.png' className='w-[42px]'/>
               <h1 className='text-2xl font-bold text-white'>ZEPHIRUS</h1>
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r ${
                 serverStatus === "CONNECTED"
@@ -602,38 +635,117 @@ export default function Home() {
                       </>
                     )}
                   </div>
-
-                  {/* Quick Set Buttons */}
-                  {/* <div className='flex gap-1 mt-2'>
-                    <button
-                      onClick={() => {
-                        // Set home to current UAV position
-                        const newLocation = isPlaybackMode 
-                          ? { lat: displayData?.lat, lng: displayData?.lon }
-                          : { lat: currentData?.lat, lng: currentData?.lon };
-                        if (newLocation.lat && newLocation.lng) {
-                          setHomeLocation(newLocation);
-                        }
-                      }}
-                      className='flex-1 px-2 py-1 text-xs text-white transition-colors bg-blue-600 rounded hover:bg-blue-500'
-                      disabled={(!currentData?.lat && !displayData?.lat)}
-                    >
-                      Set to UAV
-                    </button>
-                    <button
-                      onClick={() => {
-                        // Copy to clipboard
-                        navigator.clipboard.writeText(`${homeLocation.lat}, ${homeLocation.lng}`);
-                      }}
-                      className='flex-1 px-2 py-1 text-xs text-white transition-colors bg-purple-600 rounded hover:bg-purple-500'
-                    >
-                      Copy
-                    </button>
-                  </div> */}
                 </div>
               </div>
             </div>
-            {/* </div> */}
+
+            {/* Weather and Flight Analysis */}
+            <div className='flex flex-col w-full gap-4 py-4 mt-4 border-t border-gray-700'>
+              <p className='text-sm font-semibold text-center text-gray-300'>
+                WEATHER & FLIGHT ANALYSIS
+              </p>
+              
+              <div className='grid w-full grid-cols-2 gap-4'>
+                {/* Weather Information */}
+                <div className='p-3 border rounded-xl bg-gradient-to-r from-blue-700/50 to-blue-800/50 backdrop-blur-sm border-gray-600/30'>
+                  <div className='flex items-center justify-between mb-3'>
+                    <div className='flex items-center'>
+                      <FaCloudSun className='w-4 h-4 mr-2 text-blue-300' />
+                      <p className='text-sm font-semibold text-gray-300'>Current Weather</p>
+                    </div>
+                    <button
+                      onClick={() => fetchWeather(homeLocation.lat, homeLocation.lng)}
+                      className='p-1 text-xs text-blue-400 transition-colors hover:text-blue-300'
+                      title='Refresh Weather'
+                      disabled={weatherLoading}
+                    >
+                      <FaSync className={`w-3 h-3 ${weatherLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+
+                  {weatherLoading && (
+                    <div className="text-center text-blue-400">Loading weather...</div>
+                  )}
+                  
+                  {weatherError && (
+                    <div className="text-center text-red-400">{weatherError}</div>
+                  )}
+                  
+                  {weatherData && !weatherLoading && (
+                    <div className='space-y-2'>
+                      <div className='flex flex-col justify-between'>
+                        <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Condition:</span>
+                          <span className='text-sm font-semibold text-white'>
+                            {getWeatherIcon(weatherData.weatherCode)} {getFlightConditions(weatherData)}
+                          </span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Temp:</span>
+                          <span className='ml-1 text-xs font-semibold text-white'>{weatherData.temperature}°C</span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Humidity:</span>
+                          <span className='ml-1 text-xs font-semibold text-white'>{weatherData.humidity}%</span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Wind:</span>
+                          <span className='ml-1 text-xs font-semibold text-white'>{weatherData.windSpeed} m/s</span>
+                        </div>
+                        <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Rain:</span>
+                          <span className='ml-1 text-xs font-semibold text-white'>{weatherData.rain} mm</span>
+                        </div>
+                      </div>
+                      
+                      <div className='pt-2 mt-2 border-t border-gray-600/50'>
+                        <div className='text-xs text-gray-400'>
+                          Flight Conditions: <span className={`font-semibold ${
+                            getFlightConditions(weatherData) === 'Good' ? 'text-green-400' :
+                            getFlightConditions(weatherData) === 'Moderate' ? 'text-yellow-400' : 'text-red-400'
+                          }`}>
+                            {getFlightConditions(weatherData)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* AI Flight Analysis */}
+                <div className='p-3 border rounded-xl bg-gradient-to-r from-purple-700/50 to-purple-800/50 backdrop-blur-sm border-gray-600/30'>
+                  <div className='flex items-center mb-3'>
+                    <FaRobot className='w-4 h-4 mr-2 text-purple-300' />
+                    <p className='text-sm font-semibold text-gray-300'>Flight Safety Analysis</p>
+                  </div>
+
+                  {analysisLoading && (
+                    <div className="text-center text-purple-400">Analyzing conditions...</div>
+                  )}
+                  
+                  {analysisError && (
+                    <div className="text-center text-red-400">{analysisError}</div>
+                  )}
+                  
+                  {analysis && !analysisLoading && (
+                    <div className='text-xs text-white'>
+                      {analysis.split('. ').map((sentence, index) => (
+                        <div key={index} className="mb-1">
+                          {sentence.trim()}
+                          {index < analysis.split('. ').length - 1 ? '.' : ''}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {!analysis && !analysisLoading && (
+                    <div className='text-xs text-center text-gray-400'>
+                      Weather data required for analysis
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Flight Indicators Section */}
