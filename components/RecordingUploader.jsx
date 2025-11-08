@@ -162,41 +162,10 @@ export default function RecordingUploader({ onRecordingLoaded, playback, serverS
               )}
             </div>
 
-            {/* Speed Control */}
-            <select
-              value={playback.playbackSpeed}
-              onChange={(e) => playback.setPlaybackSpeed(parseFloat(e.target.value))}
-              className="px-2 py-1 text-sm text-white bg-gray-600 border border-gray-500 rounded"
-            >
-              <option value={0.5}>0.5x</option>
-              <option value={1}>1x</option>
-              <option value={2}>2x</option>
-              <option value={5}>5x</option>
-              <option value={10}>10x</option>
-            </select>
-
             {/* Frame Info */}
             <div className="text-xs text-gray-300">
               {playback.currentFrameIndex + 1} / {playback.frameCount}
             </div>
-          </div>
-
-          {/* Seek Controls */}
-          <div className="flex gap-1">
-            <button
-              onClick={() => playback.seekTo(playback.currentTime - 5000)}
-              className="flex-1 px-2 py-1 text-xs text-white transition-colors bg-gray-600 rounded hover:bg-gray-500"
-            >
-              <FaBackward className="inline w-3 h-3 mr-1" />
-              5s
-            </button>
-            <button
-              onClick={() => playback.seekTo(playback.currentTime + 5000)}
-              className="flex-1 px-2 py-1 text-xs text-white transition-colors bg-gray-600 rounded hover:bg-gray-500"
-            >
-              <FaForward className="inline w-3 h-3 mr-1" />
-              5s
-            </button>
           </div>
         </div>
       )}
