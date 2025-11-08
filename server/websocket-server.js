@@ -22,6 +22,7 @@ async function connectPort() {
   }
 
   console.log("✅ Connecting to:", device.path);
+  await new Promise(resolve => setTimeout(resolve, 1500)); // Wait for udev to finish
 
   port = new SerialPort({
     path: device.path,
@@ -32,6 +33,7 @@ async function connectPort() {
   port.open(err => {
     if (err) {
       console.log("Open failed:", err.message);
+      setTimeout(connectPort, 2000); // Remember to comment this if necessary
     }
   });
 
@@ -73,6 +75,10 @@ async function connectPort() {
 
   port.on('error', (err) => {
     console.error("Serial error", err.message);
+
+    if (port.isOpen) {
+      try { port.close(); } catch (e) {}
+    }
 
     if (parser) parser.removeAllListeners();
     if (port) port.removeAllListeners();
