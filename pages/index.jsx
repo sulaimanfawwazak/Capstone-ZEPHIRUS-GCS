@@ -4,7 +4,8 @@ import Head from 'next/head';
 import TelemetryGraph from '@/components/TelemetryGraph';
 import FlightIndicators from '@/components/FlightIndicators';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal } from "react-icons/fa";
+import { useFlightRecorder } from '@/hooks/useFlightRecorder';
+import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash } from "react-icons/fa";
 import { FaMapLocationDot, FaTemperatureHalf, FaRotate, FaPlaneCircleCheck, FaPlaneCircleXmark, FaPlaneUp } from "react-icons/fa6";
 import { WiHumidity } from "react-icons/wi";
 import { PiShowerFill } from "react-icons/pi";
@@ -17,6 +18,8 @@ import { MdSatelliteAlt } from "react-icons/md";
 import { LuServerOff } from "react-icons/lu";
 import { useState, useEffect } from 'react';
 import UAVModel from '@/components/UAVModel';
+import RecordingUploader from '@/components/RecordingUploader';
+import { useFlightPlayback } from '@/hooks/useFlightPlayback';
 
 // load only on client
 const Map = dynamic(() => import("../components/Map"), { ssr: false });
@@ -24,26 +27,31 @@ const Map = dynamic(() => import("../components/Map"), { ssr: false });
 // WebSocket server URL (you'll need to set this up)
 const WS_URL = 'ws://localhost:8080';
 
-// const planeLocation = { 
-//   // set map view to DTETI
-//   lat: -7.765719073300151, 
-//   lng: 110.37171384759249
-// }
-
 const homeLocation = {
-  // lat:-7.765199289055551,
-  // lng: 110.37247797203575
   lat: -7.765893863580182,
   lng: 110.37179784326118
 };
 
-
 export default function Home() {
-  const { data: telemetryData, isConnected, serverStatus, error } = useWebSocket(WS_URL); 
+  const { data: telemetryData, serverStatus, error } = useWebSocket(WS_URL); 
   const [telemetryHistory, setTelemetryHistory] = useState([]);
   const [flightTrail, setFlightTrail] = useState([]);
   const [isFirstData, setIsFirstData] = useState(true);
   const [groundSpeed, setGroundSpeed] = useState(0);
+
+  // Initialize flight recorder
+  const {
+    isRecording,
+    recordedData,
+    recordingStartTime,
+    startRecording,
+    stopRecording,
+    clearRecording,
+    addDataPoint,
+    downloadRecording,
+    recordingDuration,
+    dataPointsCount
+  } = useFlightRecorder();
   
   // Update history when new data arrives
   useEffect(() => {
@@ -52,6 +60,8 @@ export default function Home() {
         const newHistory = [...prev, telemetryData];
         return newHistory.slice(-50); // Keep only last 50 data points for performance
       });
+
+      addDataPoint(telemetryData);
 
       setTelemetryHistory(prev => {
         if (prev.length > 0) {
@@ -101,7 +111,7 @@ export default function Home() {
         setIsFirstData(false);
       }
     }
-  }, [telemetryData, isFirstData]);
+  }, [telemetryData, isFirstData, addDataPoint]);
 
   // Icons for the map
   const planeIcon = {
@@ -139,10 +149,10 @@ export default function Home() {
     hum_status: 0
   };
 
-  const planeLocation = {
-    lat: currentData.lat,
-    lng: currentData.lon
-  };
+  // const planeLocation = {
+  //   lat: currentData.lat,
+  //   lng: currentData.lon
+  // };
 
   // Calculate distance to home (simple haversine formula)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -156,13 +166,6 @@ export default function Home() {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
-
-  const distanceToHome = calculateDistance(
-    currentData.lat, 
-    currentData.lon, 
-    homeLocation.lat, 
-    homeLocation.lng
-  );  
 
   // Status color function
   const getStatusColor = (value, type) => {
@@ -183,7 +186,54 @@ export default function Home() {
     }
   };
 
-  const planeStatus = "DISCONNECTED";
+  // Format recording duration
+  const formatDuration = (ms) => {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  // Add playback functionality
+  const playback = useFlightPlayback();
+
+  // Determine if we're in playback mode or live mode
+  const isPlaybackMode = playback.hasRecording && serverStatus === "OFF";
+  const displayData = isPlaybackMode ? playback.getCurrentFrame() : currentData;
+
+  // Handle recording loaded
+  const handleRecordingLoaded = (data) => {
+    playback.loadRecording(data);
+  };
+
+  // Add exit playback handler
+  const handleExitPlayback = () => {
+    // Stop any ongoing playback
+    playback.stopPlayback();
+    // Clear the playback data - this will make playback.hasRecording = false
+    playback.loadRecording([]);
+  };
+
+  const planeLocation = {
+    lat: displayData?.lat || currentData?.lat,
+    lng: displayData?.lon || currentData?.lon
+  };
+
+  const distanceToHome = !isPlaybackMode 
+    ? calculateDistance(currentData.lat, currentData.lon, homeLocation.lat, homeLocation.lng) 
+    : calculateDistance(displayData?.lat, displayData?.lon, homeLocation.lat, homeLocation.lng);
+
+  // Update your Map component to show playback trail
+  const playbackTrail = playback.playbackData
+    .filter(point => point.recordingTimestamp <= playback.currentTime)
+    .map(point => [point.lat, point.lon]);
 
   return (
     <>
@@ -212,7 +262,7 @@ export default function Home() {
               homeIcon={homeIcon}
               planeIcon={planeIcon}
               heading={currentData.heading}
-              flightTrail={flightTrail}
+              flightTrail={isPlaybackMode ? playbackTrail : flightTrail}
               onClearTrail={handleClearTrail}
             />
           </div>
@@ -249,24 +299,120 @@ export default function Home() {
               </div>
             </div>
 
+            {/* */}
+
+            {/* Recording Controls Section - Updated */}
+            <div className='mb-4'>
+              <div className='flex items-center justify-between mb-2'>
+                <span className='text-sm font-semibold text-gray-300'>
+                  {isPlaybackMode ? 'FLIGHT PLAYBACK' : 'FLIGHT RECORDER'}
+                </span>
+                <div className={`px-2 py-1 rounded text-xs ${
+                  isRecording 
+                    ? 'bg-red-500 text-white' 
+                    : isPlaybackMode
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-600 text-gray-300'
+                }`}>
+                  {isRecording ? '● RECORDING' : isPlaybackMode ? '▶ PLAYBACK' : 'READY'}
+                </div>
+              </div>
+              
+              {/* Recording Uploader */}
+              <RecordingUploader 
+                onRecordingLoaded={handleRecordingLoaded}
+                playback={playback}
+                serverStatus={serverStatus}
+                onExitPlayback={handleExitPlayback}
+              />
+              
+              {/* Only show recording controls if not in playback mode */}
+              {!isPlaybackMode && (
+                <div className='flex gap-2 mt-3'>
+                  {!isRecording ? (
+                    <button
+                      onClick={startRecording}
+                      disabled={serverStatus !== "CONNECTED"}
+                      className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-sm font-medium text-white transition-colors bg-red-600 rounded-lg hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                    >
+                      <FaRecordVinyl className="w-4 h-4" />
+                      Start Recording
+                    </button>
+                  ) : (
+                    <button
+                      onClick={stopRecording}
+                      className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-sm font-medium text-white transition-colors bg-yellow-600 rounded-lg hover:bg-yellow-700"
+                    >
+                      <FaStop className="w-4 h-4" />
+                      Stop Recording
+                    </button>
+                  )}
+                  
+                  {recordedData.length > 0 && (
+                    <button
+                      onClick={() => downloadRecording('csv')}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white transition-colors bg-green-600 rounded-lg hover:bg-green-700"
+                      title="Download as flight recording"
+                    >
+                      <FaDownload className="w-4 h-4" />
+                    </button>
+                  )}
+                  
+                  {recordedData.length > 0 && (
+                    <button
+                      onClick={clearRecording}
+                      className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white transition-colors bg-gray-600 rounded-lg hover:bg-gray-700"
+                      title="Clear Recording"
+                    >
+                      <FaTrash className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+              
+              {/* Recording/Playback Status */}
+              {isRecording && (
+                <div className="mt-2 text-xs text-gray-400">
+                  <div>Recording: {formatDuration(recordingDuration)}</div>
+                  <div>Data Points: {dataPointsCount}</div>
+                </div>
+              )}
+              
+              {isPlaybackMode && (
+                <div className="mt-2 text-xs text-blue-400">
+                  <div>Playback: {Math.round(playback.progress * 100)}% Complete</div>
+                  <div>Speed: {playback.playbackSpeed}x</div>
+                </div>
+              )}
+              
+              {recordedData.length > 0 && !isRecording && !isPlaybackMode && (
+                <div className="mt-2 text-xs text-green-400">
+                  ✓ Recorded {dataPointsCount} data points
+                </div>
+              )}
+            </div>
+
             {/* Quick Status */}
             <div className='grid grid-cols-3 gap-3'>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>ALTITUDE</p>
-                <p className='text-lg font-bold text-white'>{currentData?.altitude} m</p>
+                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? currentData?.altitude : displayData?.altitude} m</p>
               </div>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>SPEED</p>
-                <p className='text-lg font-bold text-white'>{currentData?.groundSpeed} m/s</p>
+                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? currentData?.groundSpeed : displayData?.groundSpeed} m</p>
               </div>
-              <div className={`p-2 text-center rounded-lg bg-gray-600/50 ${
-                currentData?.signalStrength >= 80
+              <div className={`p-2 text-center rounded-lg ${
+                (isPlaybackMode ? displayData?.signalStrength : currentData?.signalStrength) >= 80
                 ? 'bg-gradient-to-r from-green-500 to-green-600'
-                : currentData?.signalStrength >= 50
+                : (isPlaybackMode ? displayData?.signalStrength : currentData?.signalStrength) >= 50
                   ? 'bg-gradient-to-r from-yellow-500 to-yellow-600'
-                  : 'bg-gradient-to-r from-red-500 to-red-600'}`}>
+                  : 'bg-gradient-to-r from-red-500 to-red-600'
+              }`}>
                 <p className='text-xs text-white'>SIGNAL</p>
-                <p className='text-lg font-bold text-white'>{currentData?.signalStrength} %</p>
+                <p className='text-lg font-bold text-white'>
+                  {isPlaybackMode ? displayData?.signalStrength : currentData?.signalStrength} %
+                </p>
               </div>
             </div>
           </div>
@@ -280,17 +426,17 @@ export default function Home() {
               
               {/* Telemetry Cards */}
               {[
-                { icon: TbRulerMeasure2, label: 'Altitude', value: `${currentData?.altitude?.toFixed(1)} m`, color: 'default' },
-                { icon: FaTemperatureHalf, label: 'Temperature', value: `${currentData?.temperature?.toFixed(1)} °C`, color: 'default' },
-                { icon: IoWaterSharp, label: 'Humidity', value: `${currentData?.humidity?.toFixed(1)} %`, color: 'default' },
-                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${currentData?.groundSpeed} m/s`, color: 'default' },
-                { icon: FaSatellite, label: 'Satellite Count', value: `${currentData?.satelliteCount}`, color: 'satellite', valueColor: 'text-white' },
-                { icon: MdSatelliteAlt, label: 'HDOP', value: `${currentData?.hdop}`, color: 'satellite', valueColor: 'text-white' },
-                { icon: FaSignal, label: 'Signal Strength', value: `${currentData?.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
-                { icon: FaArrowsAltV, label: 'Pitch', value: `${currentData?.pitch} °`, color: 'default' },
-                { icon: FaRotate, label: 'Roll', value: `${currentData?.roll} °`, color: 'default' },
-                { icon: FaLocationArrow, label: 'Heading', value: `${currentData?.heading?.toFixed(1)} °`, color: 'default' },
-                { icon: PiShowerFill, label: 'Humidifier', value: `${currentData?.hum_status === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
+                { icon: TbRulerMeasure2, label: 'Altitude', value: `${!isPlaybackMode ? currentData?.altitude?.toFixed(1) : displayData?.altitude?.toFixed(1)} m`, color: 'default' },
+                { icon: FaTemperatureHalf, label: 'Temperature', value: `${!isPlaybackMode ? currentData?.temperature?.toFixed(1) : displayData?.temperature?.toFixed(1)} °C`, color: 'default' },
+                { icon: IoWaterSharp, label: 'Humidity', value: `${!isPlaybackMode ? currentData?.humidity?.toFixed(1) : displayData?.humidity?.toFixed(1)} %`, color: 'default' },
+                { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${!isPlaybackMode ? currentData?.groundSpeed : displayData?.groundSpeed} m/s`, color: 'default' },
+                { icon: FaSatellite, label: 'Satellite Count', value: `${!isPlaybackMode ? currentData?.satelliteCount : displayData?.satelliteCount}`, color: 'satellite', valueColor: 'text-white' },
+                { icon: MdSatelliteAlt, label: 'HDOP', value: `${!isPlaybackMode ? currentData?.hdop : displayData?.hdop}`, color: 'satellite', valueColor: 'text-white' },
+                { icon: FaSignal, label: 'Signal Strength', value: `${!isPlaybackMode ? currentData?.signalStrength : displayData?.signalStrength} %`, color: 'signal', valueColor: 'text-white' },
+                { icon: FaArrowsAltV, label: 'Pitch', value: `${!isPlaybackMode ? currentData?.pitch : displayData?.pitch} °`, color: 'default' },
+                { icon: FaRotate, label: 'Roll', value: `${!isPlaybackMode ? currentData?.roll : displayData?.roll} °`, color: 'default' },
+                { icon: FaLocationArrow, label: 'Heading', value: `${!isPlaybackMode ? currentData?.heading?.toFixed(1) : displayData?.heading?.toFixed(1)} °`, color: 'default' },
+                { icon: PiShowerFill, label: 'Humidifier', value: `${(!isPlaybackMode ? currentData?.hum_status : displayData?.hum_status) === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
                 { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome?.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
               ].map((item, index) => (
                 <div 
@@ -324,8 +470,8 @@ export default function Home() {
                       <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
                     </div>
                     <div className='space-y-1'>
-                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{currentData.lat}</span></p>
-                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{currentData.lon}</span></p>
+                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lat : displayData?.lat}</span></p>
+                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lon : displayData?.lon}</span></p>
                     </div>
                   </div>
 
@@ -351,9 +497,9 @@ export default function Home() {
             {/* 3D Attitude */}
             <div className='pb-4 -mt-12 border-b border-gray-700'>
               <UAVModel
-                roll={currentData?.roll}
-                pitch={currentData?.pitch}
-                heading={currentData?.heading}
+                roll={!isPlaybackMode ? currentData?.roll : displayData?.roll}
+                pitch={!isPlaybackMode ? currentData?.pitch : displayData?.pitch}
+                heading={!isPlaybackMode ? currentData?.heading : displayData?.heading}
               />
               <p className='text-sm font-semibold text-center text-gray-300'>
                 3D ORIENTATION
@@ -363,9 +509,9 @@ export default function Home() {
             {/* Artificial Horizon & Heading */}
             <div className='p-4'>
               <FlightIndicators
-                roll={currentData?.roll}
-                pitch={currentData?.pitch}
-                heading={currentData?.heading}
+                roll={!isPlaybackMode ? currentData?.roll : displayData?.roll}
+                pitch={!isPlaybackMode ? currentData?.pitch : displayData?.pitch}
+                heading={!isPlaybackMode ? currentData?.heading : displayData?.heading}
               />
               <p className='mt-2 text-sm font-semibold text-center text-gray-300'>
                 ATTITUDE & HEADING
