@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { MapContainer, Marker, Popup, useMap, Polyline } from "react-leaflet";
 import L from "leaflet";
+import { FaMapPin, FaTrash } from "react-icons/fa";
 
 function BingHybridLayer() {
   const map = useMap();
@@ -142,19 +143,29 @@ function MapControls({ followUAV, onFollowToggle, onClearTrail }) {
       <div className="flex items-center space-x-2">
         <button
           onClick={onFollowToggle}
-          className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+          className={`flex flex-row px-3 py-2 rounded text-sm font-medium transition-colors items-center justify-center ${
             followUAV 
               ? 'bg-green-600 text-white hover:bg-green-700' 
-              : 'bg-gray-600 text-white hover:bg-gray-700'
+              : 'bg-blue-600 text-white hover:bg-blue-700'
           }`}
         >
-          {followUAV ? '📍 Following' : '📍 Follow UAV'}
+          {followUAV
+            ? <div className="flex flex-row items-center justify-center">
+                <p>Following</p>
+                <FaMapPin className="ml-2"/>
+              </div>
+            : <div className="flex flex-row items-center justify-center">
+                <p>Follow UAV</p>
+                <FaMapPin className="ml-2"/>
+              </div>
+          }
         </button>
         <button
           onClick={onClearTrail}
-          className="px-3 py-2 text-sm font-medium text-white transition-colors bg-red-600 rounded hover:bg-red-700"
+          className="flex flex-row items-center justify-center px-3 py-2 text-sm font-medium text-white transition-colors bg-red-600 rounded hover:bg-red-700"
         >
-          🗑️ Clear Trail
+          Clear Trail
+          <FaTrash className="ml-2"/>
         </button>
       </div>
       <div className="text-xs text-center text-gray-600">
