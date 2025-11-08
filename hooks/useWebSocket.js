@@ -12,7 +12,7 @@ export function useWebSocket(url) {
   const lastDataTimeRef = useRef(null);
 
   const DISCONNECT_TIMEOUT = 5000; // 5 seconds without data = disconnected
-  const RSSI_THRESHOLD = 5; // 5%
+  // const RSSI_THRESHOLD = 5; // 5%
 
   useEffect(() => {
     if (!url) return;
@@ -44,13 +44,8 @@ export function useWebSocket(url) {
         // lastDataTimeRef.current = Date.now();
         
         // ✅ We have UAV data - check signal strength
-        if (json.rssi !== undefined && json.rssi < RSSI_THRESHOLD) {
-          console.log("Signal too weak - DISCONNECTED");
-          setServerStatus("DISCONNECTED");
-        } else {
-          // ✅ Good signal and data - we're CONNECTED
-          setServerStatus("CONNECTED");
-        }
+        // ✅ Good signal and data - we're CONNECTED
+        setServerStatus("CONNECTED");
 
         // ✅ Reset timeout when new data arrives
         clearTimeout(timeoutRef.current);
