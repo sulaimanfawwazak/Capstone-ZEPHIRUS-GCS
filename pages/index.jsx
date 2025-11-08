@@ -5,7 +5,7 @@ import TelemetryGraph from '@/components/TelemetryGraph';
 import FlightIndicators from '@/components/FlightIndicators';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useFlightRecorder } from '@/hooks/useFlightRecorder';
-import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash } from "react-icons/fa";
+import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash, FaCheck, FaEdit } from "react-icons/fa";
 import { FaMapLocationDot, FaTemperatureHalf, FaRotate, FaPlaneCircleCheck, FaPlaneCircleXmark, FaPlaneUp } from "react-icons/fa6";
 import { WiHumidity } from "react-icons/wi";
 import { PiShowerFill } from "react-icons/pi";
@@ -13,13 +13,15 @@ import { GiSatelliteCommunication, GiPathDistance } from "react-icons/gi";
 import { IoIosSpeedometer } from "react-icons/io";
 import { IoLocationSharp, IoWaterSharp, IoHomeSharp } from "react-icons/io5";
 import { TbAntennaBars5, TbRulerMeasure2 } from "react-icons/tb";
-import { RiPinDistanceFill } from "react-icons/ri";
+import { RiPinDistanceFill, RiResetLeftFill } from "react-icons/ri";
 import { MdSatelliteAlt } from "react-icons/md";
 import { LuServerOff } from "react-icons/lu";
+import { RxCross2 } from "react-icons/rx";
 import { useState, useEffect } from 'react';
 import UAVModel from '@/components/UAVModel';
 import RecordingUploader from '@/components/RecordingUploader';
 import { useFlightPlayback } from '@/hooks/useFlightPlayback';
+import { useSpriteAnimator } from '@react-three/drei';
 
 // load only on client
 const Map = dynamic(() => import("../components/Map"), { ssr: false });
@@ -27,9 +29,9 @@ const Map = dynamic(() => import("../components/Map"), { ssr: false });
 // WebSocket server URL (you'll need to set this up)
 const WS_URL = 'ws://localhost:8080';
 
-const homeLocation = {
-  lat: -7.765893863580182,
-  lng: 110.37179784326118
+const defaultHomeLocation = {
+  lat: -7.7658938635,
+  lng: 110.3717978432
 };
 
 export default function Home() {
@@ -38,6 +40,52 @@ export default function Home() {
   const [flightTrail, setFlightTrail] = useState([]);
   const [isFirstData, setIsFirstData] = useState(true);
   const [groundSpeed, setGroundSpeed] = useState(0);
+  const [homeLocation, setHomeLocation]  = useState(defaultHomeLocation);
+  const [isEditingHome, setIsEditingHome] = useState(false);
+  const [tempHomeLocation, setTempHomeLocation] = useState(defaultHomeLocation);
+
+  // Home Editing utils
+  // Initialize editing when component mounts
+  useEffect(() => {
+    setTempHomeLocation(homeLocation);
+  }, [homeLocation]);
+
+  // Home location editing functions
+  const startEditingHome = () => {
+    setTempHomeLocation(homeLocation);
+    setIsEditingHome(true);
+  };
+
+  const saveHomeLocation = () => {
+    setHomeLocation(tempHomeLocation);
+    setIsEditingHome(false);
+  };
+
+  const cancelEditingHome = () => {
+    setTempHomeLocation(homeLocation);
+    setIsEditingHome(false);
+  };
+
+  const resetHomeLocation = () => {
+    setHomeLocation(defaultHomeLocation);
+    setTempHomeLocation(defaultHomeLocation);
+    setIsEditingHome(false);
+  };
+
+  //Handle coordinate input change
+  const handleLatChange = (e) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value)) {
+      setTempHomeLocation(prev => ({ ...prev, lat: value }));
+    }
+  }
+
+  const handleLonChange = (e) => {
+    const value = parseFloat(e.target.value);
+    if (!isNaN(value)) {
+      setTempHomeLocation(prev => ({ ...prev, lon: value }));
+    }
+  }
 
   // Initialize flight recorder
   const {
@@ -269,7 +317,11 @@ export default function Home() {
 
           {/* 1/4 of height - Graph & Attitude */}
           <div className='border-gray-700 h-1/4 bg-gray-800/80 backdrop-blur-sm rounded-t-2xl'>
-            <TelemetryGraph data={telemetryHistory}/>
+            <TelemetryGraph data={
+              !isPlaybackMode
+                ? telemetryHistory
+                : playback.playbackData.filter(point => point.recordingTimestamp <= playback.currentTime)}
+            />
           </div>
         </div>
 
@@ -381,7 +433,6 @@ export default function Home() {
               {isPlaybackMode && (
                 <div className="mt-2 text-xs text-blue-400">
                   <div>Playback: {Math.round(playback.progress * 100)}% Complete</div>
-                  <div>Speed: {playback.playbackSpeed}x</div>
                 </div>
               )}
               
@@ -458,37 +509,130 @@ export default function Home() {
               ))}
             </div>
 
-              {/* Coordinate Cards */}
-              <div className='flex flex-col w-full gap-4 mt-4 border-t border-gray-700 py-7'>
-                <p className='text-sm font-semibold text-center text-gray-300'>
-                  COORDINATES
-                </p>
-                <div className='flex flex-row w-full gap-4'>
-                  <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
-                    <div className='flex items-center mb-2'>
-                      <FaPlaneUp className='w-4 h-4 mr-2 text-blue-400' />
-                      <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
-                    </div>
-                    <div className='space-y-1'>
-                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lat : displayData?.lat}</span></p>
-                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lon : displayData?.lon}</span></p>
-                    </div>
+            {/* Coordinate Cards - Updated */}
+            <div className='flex flex-col w-full gap-4 mt-4 border-t border-gray-700 py-7'>
+              <p className='text-sm font-semibold text-center text-gray-300'>
+                COORDINATES
+              </p>
+              <div className='grid w-full h-full grid-cols-2 gap-4 '>
+                {/* UAV Position (unchanged) */}
+                <div className='flex flex-col justify-center p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                  <div className='flex items-center mb-2'>
+                    <FaPlaneUp className='w-4 h-4 mr-2 text-blue-400' />
+                    <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
                   </div>
-
-                  <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
-                    <div className='flex items-center mb-2'>
-                      <IoHomeSharp className='w-4 h-4 mr-2 text-green-400' />
-                      <p className='text-sm font-semibold text-gray-300'>Home Position</p>
-                    </div>
-                    <div className='space-y-1'>
-                      <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{homeLocation.lat}</span></p>
-                      <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{homeLocation.lng}</span></p>
-                    </div>
+                  <div className='space-y-1'>
+                    <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lat?.toFixed(6) : displayData?.lat?.toFixed(6)}</span></p>
+                    <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lon?.toFixed(6) : displayData?.lon?.toFixed(6)}</span></p>
                   </div>
                 </div>
 
+                {/* Home Position - Now Editable */}
+                <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                  <div className='flex items-center justify-between mb-2'>
+                    <div className='flex items-center'>
+                      <IoHomeSharp className='w-4 h-4 mr-2 text-green-400' />
+                      <p className='text-sm font-semibold text-gray-300'>Home Position</p>
+                    </div>
+                    <div className='flex gap-1'>
+                      {!isEditingHome ? (
+                        <button
+                          onClick={startEditingHome}
+                          className='p-0.5 text-xs text-blue-400 transition-colors hover:text-blue-300'
+                          title='Edit Home Location'
+                        >
+                          <FaEdit />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={saveHomeLocation}
+                            className='p-0.5 text-xs text-green-400 transition-colors hover:text-green-300'
+                            title='Save'
+                          >
+                            <FaCheck />
+                          </button>
+                          <button
+                            onClick={cancelEditingHome}
+                            className='p-0.5 text-xs text-red-400 transition-colors hover:text-red-300'
+                            title='Cancel'
+                          >
+                            <RxCross2 />
+                          </button>
+                        </>
+                      )}
+                      <button
+                        onClick={resetHomeLocation}
+                        className='p-0.5 text-xs text-yellow-400 transition-colors hover:text-yellow-300'
+                        title='Reset to Default'
+                      >
+                        <RiResetLeftFill />
+                      </button>
+                    </div>
+                  </div>
 
+                  <div className='space-y-2'>
+                    {isEditingHome ? (
+                      <>
+                        <div>
+                          <label className='text-xs text-gray-400'>Latitude:</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={tempHomeLocation.lat}
+                            onChange={handleLatChange}
+                            className="w-full p-1 font-mono text-xs text-white bg-gray-600 border border-gray-500 rounded"
+                          />
+                        </div>
+                        <div>
+                          <label className='text-xs text-gray-400'>Longitude:</label>
+                          <input
+                            type="number"
+                            step="any"
+                            value={tempHomeLocation.lng}
+                            onChange={handleLonChange}
+                            className="w-full p-1 font-mono text-xs text-white bg-gray-600 border border-gray-500 rounded"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{homeLocation.lat.toFixed(6)}</span></p>
+                        <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{homeLocation.lng.toFixed(6)}</span></p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Quick Set Buttons */}
+                  {/* <div className='flex gap-1 mt-2'>
+                    <button
+                      onClick={() => {
+                        // Set home to current UAV position
+                        const newLocation = isPlaybackMode 
+                          ? { lat: displayData?.lat, lng: displayData?.lon }
+                          : { lat: currentData?.lat, lng: currentData?.lon };
+                        if (newLocation.lat && newLocation.lng) {
+                          setHomeLocation(newLocation);
+                        }
+                      }}
+                      className='flex-1 px-2 py-1 text-xs text-white transition-colors bg-blue-600 rounded hover:bg-blue-500'
+                      disabled={(!currentData?.lat && !displayData?.lat)}
+                    >
+                      Set to UAV
+                    </button>
+                    <button
+                      onClick={() => {
+                        // Copy to clipboard
+                        navigator.clipboard.writeText(`${homeLocation.lat}, ${homeLocation.lng}`);
+                      }}
+                      className='flex-1 px-2 py-1 text-xs text-white transition-colors bg-purple-600 rounded hover:bg-purple-500'
+                    >
+                      Copy
+                    </button>
+                  </div> */}
+                </div>
               </div>
+            </div>
             {/* </div> */}
           </div>
 
