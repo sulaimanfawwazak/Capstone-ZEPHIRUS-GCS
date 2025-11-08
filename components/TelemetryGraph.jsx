@@ -13,7 +13,10 @@ export default function TelemetryGraph({ data }) {
     "Temperature",
     "Humidity",
     "Heading",
-    "Ground Speed"
+    "Ground Speed",
+    "Pitch",
+    "Roll",
+    "RSSI"
   ];
 
   // Choose which data keys to show based on selection
@@ -34,19 +37,28 @@ export default function TelemetryGraph({ data }) {
       ];
       break;
     case "Altitude":
-      lines = [{ key: "altitude", name: "Altitude", color: "#00ff00" }];
+      lines = [{ key: "altitude", name: "Altitude (m)", color: "#00ff00" }];
       break;
     case "Temperature":
-      lines = [{ key: "temperature", name: "Temperature", color: "#ff4444" }];
+      lines = [{ key: "temperature", name: "Temperature (°C)", color: "#ff4444" }];
       break;
     case "Humidity":
-      lines = [{ key: "humidity", name: "Humidity", color: "#4444ff" }];
+      lines = [{ key: "humidity", name: "Humidity (%)", color: "#4444ff" }];
       break;
     case "Heading":
-      lines = [{ key: "heading", name: "Heading", color: "#00ff00" }];
+      lines = [{ key: "heading", name: "Heading (°)", color: "#00ff00" }];
       break;
     case "Ground Speed":
-      lines = [{ key: "groundSpeed", name: "Ground Speed", color: "#ff00ff" }];
+      lines = [{ key: "groundSpeed", name: "Ground Speed (m/s)", color: "#ff00ff" }];
+      break;
+    case "Pitch":
+      lines = [{ key: "pitch", name: "Pitch (°)", color: "#ff00ff" }];
+      break;
+    case "Roll":
+      lines = [{ key: "roll", name: "Roll (°)", color: "#ff00ff" }];
+      break;
+    case "RSSI":
+      lines = [{ key: "signalStrength", name: "RSSI (%)", color: "#ff00ff"}];
       break;
   }
 
