@@ -1,3 +1,4 @@
+//components/TelemetryGraph.jsx
 "use client";
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
@@ -43,10 +44,10 @@ export default function TelemetryGraph({ data }) {
       lines = [{ key: "temperature", name: "Temperature (°C)", color: "#ff4444" }];
       break;
     case "Humidity":
-      lines = [{ key: "humidity", name: "Humidity (%)", color: "#4444ff" }];
+      lines = [{ key: "humidity", name: "Humidity (%)", color: "#ff00ff" }];
       break;
     case "Heading":
-      lines = [{ key: "heading", name: "Heading (°)", color: "#00ff00" }];
+      lines = [{ key: "heading", name: "Heading (°)", color: "#ff00ff" }];
       break;
     case "Ground Speed":
       lines = [{ key: "groundSpeed", name: "Ground Speed (m/s)", color: "#ff00ff" }];
