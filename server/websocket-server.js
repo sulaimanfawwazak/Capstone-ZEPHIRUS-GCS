@@ -90,6 +90,8 @@ connectPort();
 function parseTelemetry(packet) {
   if (!packet.startsWith('<ZEPH>')) return null;
 
+  console.log("ini packet:", packet);
+
   const clean = packet.replace('<ZEPH>', '').trim();
   let parts = clean.split(',');
   parts = parts.slice(1);
