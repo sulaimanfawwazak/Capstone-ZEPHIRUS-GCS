@@ -5,13 +5,13 @@ import TelemetryGraph from '@/components/TelemetryGraph';
 import FlightIndicators from '@/components/FlightIndicators';
 import { useWebSocket } from '@/hooks/useWebSocket';
 import { useFlightRecorder } from '@/hooks/useFlightRecorder';
-import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash, FaCheck, FaEdit, FaCloudSun, FaSync, FaRobot } from "react-icons/fa";
+import { FaLocationArrow, FaArrowsAltV, FaSatellite, FaWifi, FaSignal, FaRecordVinyl, FaStop, FaDownload, FaTrash, FaCheck, FaEdit, FaCloudSun, FaSync, FaRobot, FaSpinner, FaBrain } from "react-icons/fa";
 import { FaMapLocationDot, FaTemperatureHalf, FaRotate, FaPlaneCircleCheck, FaPlaneCircleXmark, FaPlaneUp } from "react-icons/fa6";
 import { WiHumidity } from "react-icons/wi";
 import { PiShowerFill } from "react-icons/pi";
 import { GiSatelliteCommunication, GiPathDistance } from "react-icons/gi";
-import { IoIosSpeedometer } from "react-icons/io";
-import { IoLocationSharp, IoWaterSharp, IoHomeSharp } from "react-icons/io5";
+import { IoIosSpeedometer, IoIosCloseCircle } from "react-icons/io";
+import { IoLocationSharp, IoWaterSharp, IoHomeSharp, IoSparkles } from "react-icons/io5";
 import { TbAntennaBars5, TbRulerMeasure2 } from "react-icons/tb";
 import { RiPinDistanceFill, RiResetLeftFill } from "react-icons/ri";
 import { MdSatelliteAlt } from "react-icons/md";
@@ -113,10 +113,13 @@ export default function Home() {
   } = useWeather();
   
   const { 
-    analysis, 
-    loading: analysisLoading, 
-    error: analysisError, 
-    analyzeFlightConditions 
+    analysis,
+    loading: analysisLoading,
+    error: analysisError,
+    showAnalysis,
+    analyzeFlightConditions,
+    analyzeWithGemini,
+    hideAnalysis
   } = useFlightAnalysis();
 
   // Fetch weather when home location changes
@@ -126,12 +129,19 @@ export default function Home() {
     }
   }, [homeLocation, fetchWeather]);
 
+  // // Analyze conditions when weather data updates
+  // useEffect(() => {
+  //   if (weatherData) {
+  //     analyzeFlightConditions(weatherData, currentData);
+  //   }
+  // }, [weatherData, analyzeFlightConditions]);
+
   // Analyze conditions when weather data updates
-  useEffect(() => {
-    if (weatherData) {
-      analyzeFlightConditions(weatherData, currentData);
-    }
-  }, [weatherData, analyzeFlightConditions]);
+  // useEffect(() => {
+  //   if (weatherData) {
+  //     analyzeWithGemini(weatherData);
+  //   }
+  // }, [weatherData, analyzeWithGemini]);
   
   // Update history when new data arrives
   useEffect(() => {
@@ -645,7 +655,7 @@ export default function Home() {
                 WEATHER & FLIGHT ANALYSIS
               </p>
               
-              <div className='grid w-full grid-cols-2 gap-4'>
+              <div className='grid w-full grid-cols-1 gap-4'>
                 {/* Weather Information */}
                 <div className='p-3 border rounded-xl bg-gradient-to-r from-blue-700/50 to-blue-800/50 backdrop-blur-sm border-gray-600/30'>
                   <div className='flex items-center justify-between mb-3'>
@@ -693,6 +703,10 @@ export default function Home() {
                           <span className='ml-1 text-xs font-semibold text-white'>{weatherData.windSpeed} m/s</span>
                         </div>
                         <div className='flex justify-between'>
+                          <span className='text-xs text-gray-400'>Wind Direction:</span>
+                          <span className='ml-1 text-xs font-semibold text-white'>{weatherData.windDirection} °</span>
+                        </div>
+                        <div className='flex justify-between'>
                           <span className='text-xs text-gray-400'>Rain:</span>
                           <span className='ml-1 text-xs font-semibold text-white'>{weatherData.rain} mm</span>
                         </div>
@@ -714,34 +728,92 @@ export default function Home() {
 
                 {/* AI Flight Analysis */}
                 <div className='p-3 border rounded-xl bg-gradient-to-r from-purple-700/50 to-purple-800/50 backdrop-blur-sm border-gray-600/30'>
-                  <div className='flex items-center mb-3'>
-                    <FaRobot className='w-4 h-4 mr-2 text-purple-300' />
-                    <p className='text-sm font-semibold text-gray-300'>Flight Safety Analysis</p>
+                  <div className='flex items-center justify-between mb-3'>
+                    <div className='flex items-center'>
+                      {/* <FaRobot className='w-4 h-4 mr-2 text-purple-300' /> */}
+                      <IoSparkles className='w-4 h-4 mr-2 text-purple-300' />
+                      <p className='text-sm font-semibold text-gray-300'>Flight Safety Analysis</p>
+                    </div>
+
+                    {/* Show close button when analysis is visible */}
+                    {showAnalysis && (
+                      <button
+                        onClick={hideAnalysis}
+                        className='p-1 text-xs text-red-400 transition-colors hover:text-red-300'
+                        title='Hide Analysis'
+                      >
+                        <IoIosCloseCircle className="w-4 h-4" />
+                      </button>
+                    )}      
                   </div>
 
-                  {analysisLoading && (
-                    <div className="text-center text-purple-400">Analyzing conditions...</div>
+                  {/* Show button to trigger analysis when not visible */}
+                  {!showAnalysis && (
+                    <div className='space-y-3'>
+                      <div className='text-xs text-center text-gray-400'>
+                        Get AI-powered flight safety analysis
+                      </div>
+                      <div className='flex flex-col gap-2'>
+                        <button
+                          onClick={() => analyzeFlightConditions(weatherData, currentData)}
+                          disabled={!weatherData || analysisLoading}
+                          className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-xs font-medium text-white transition-colors bg-purple-600 rounded-lg hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                        >
+                          {analysisLoading ? (
+                            <FaSpinner className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <FaRobot className="w-3 h-3" />
+                          )}
+                          Quick Analysis
+                        </button>
+                        
+                        {/* Optional: Gemini AI button if you have API key */}
+                        {process.env.NEXT_PUBLIC_GEMINI_API_KEY && (
+                          <button
+                            onClick={() => analyzeWithGemini(weatherData)}
+                            disabled={!weatherData || analysisLoading}
+                            className="flex items-center justify-center flex-1 gap-2 px-3 py-2 text-xs font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed"
+                            title="AI Analysis (Gemini)"
+                          >
+                            {analysisLoading ? (
+                              <FaSpinner className="w-3 h-3 animate-spin" />
+                            ) : (
+                              <IoSparkles className="w-3 h-3" />
+                            )}
+                            AI Analysis
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   )}
-                  
-                  {analysisError && (
-                    <div className="text-center text-red-400">{analysisError}</div>
-                  )}
-                  
-                  {analysis && !analysisLoading && (
-                    <div className='text-xs text-white'>
-                      {analysis.split('. ').map((sentence, index) => (
-                        <div key={index} className="mb-1">
-                          {sentence.trim()}
-                          {index < analysis.split('. ').length - 1 ? '.' : ''}
+
+                  {/* Show analysis results when visible */}
+                  {showAnalysis && (
+                    <>
+                      {analysisLoading && (
+                        <div className="flex items-center justify-center gap-2 text-purple-400">
+                          <FaSpinner className="w-3 h-3 animate-spin" />
+                          Analyzing conditions...
                         </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {!analysis && !analysisLoading && (
-                    <div className='text-xs text-center text-gray-400'>
-                      Weather data required for analysis
-                    </div>
+                      )}
+                      
+                      {analysisError && (
+                        <div className="text-xs text-center text-red-400">{analysisError}</div>
+                      )}
+                      
+                      {analysis && !analysisLoading && (
+                        <div className='space-y-2 text-xs text-white'>
+                          {analysis.split('. ').map((sentence, index) => (
+                            sentence.trim() && (
+                              <div key={index} className="flex items-start">
+                                <span className="mr-2">•</span>
+                                <span>{sentence.trim()}{index < analysis.split('. ').length - 1 ? '.' : ''}</span>
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
