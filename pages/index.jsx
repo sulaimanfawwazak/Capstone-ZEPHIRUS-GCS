@@ -128,20 +128,6 @@ export default function Home() {
       fetchWeather(homeLocation.lat, homeLocation.lng);
     }
   }, [homeLocation, fetchWeather]);
-
-  // // Analyze conditions when weather data updates
-  // useEffect(() => {
-  //   if (weatherData) {
-  //     analyzeFlightConditions(weatherData, currentData);
-  //   }
-  // }, [weatherData, analyzeFlightConditions]);
-
-  // Analyze conditions when weather data updates
-  // useEffect(() => {
-  //   if (weatherData) {
-  //     analyzeWithGemini(weatherData);
-  //   }
-  // }, [weatherData, analyzeWithGemini]);
   
   // Update history when new data arrives
   useEffect(() => {
@@ -238,11 +224,6 @@ export default function Home() {
     lon: 110.37171384759249,
     hum_status: 0
   };
-
-  // const planeLocation = {
-  //   lat: currentData.lat,
-  //   lng: currentData.lon
-  // };
 
   // Calculate distance to home (simple haversine formula)
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
