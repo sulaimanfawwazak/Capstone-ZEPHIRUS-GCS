@@ -24,12 +24,25 @@ import { useFlightPlayback } from '@/hooks/useFlightPlayback';
 import { useSpriteAnimator } from '@react-three/drei';
 import { useWeather } from '@/hooks/useWeather';
 import { useFlightAnalysis } from '@/hooks/useFlightAnalysis';
+import { useDeviceCompatibility } from '@/hooks/useDeviceCompatibility';
+import DeviceIncompatible from '@/components/DeviceIncompatible';
 
 // load only on client
 const Map = dynamic(() => import("../components/Map"), { ssr: false });
 
+const getWebSocketURL = () => {
+  // For production - use current hostname
+  if (typeof window !== 'undefined') {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostname = window.location.hostname;
+    return `${protocol}//${hostname}:8080`;
+  }
+}
+
 // WebSocket server URL (you'll need to set this up)
-const WS_URL = 'ws://localhost:8080';
+// const WS_URL = 'ws://localhost:8080';
+const WS_URL = getWebSocketURL();
+
 
 const defaultHomeLocation = {
   lat: -7.7658938635,
@@ -348,6 +361,18 @@ export default function Home() {
     .filter(point => point.recordingTimestamp <= playback.currentTime)
     .map(point => [point.lat, point.lng]);
 
+  // Add device compatibility check
+  const { isCompatible, screenInfo, minWidth, minHeight } = useDeviceCompatibility();
+  
+  // If device is not compatible, show the incompatible screen
+  if (!isCompatible) {
+    return <DeviceIncompatible 
+      screenInfo={screenInfo} 
+      minWidth={minWidth} 
+      minHeight={minHeight} 
+    />;
+  }
+
   return (
     <>
       {/* METADATA START */}
@@ -355,7 +380,7 @@ export default function Home() {
         <title>ZEPHIRUS GCS</title>
         <meta charSet='UTF-8'></meta>
         <meta name='viewport' content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'></meta>
-        <link rel='icon' href='/plane-emoji.png' sizes='any'/>
+        <link rel='icon' href='/ZEPHIRUS-CAD-color-top.png' sizes='any'/>
         <script src="js/reactjs/main.js" type = "text/babel"></script>
       </Head>
       {/* METADATA END */}
@@ -364,7 +389,7 @@ export default function Home() {
       <div className='fixed inset-0 flex bg-gray-900'>
         
         {/* Left Side */}
-        <div className='flex flex-col w-4/5 h-full'>
+        <div className='flex flex-col w-4/5 h-full lg:w-3/4 xl:w-4/5'>
           
           {/* 3/4 of height - Map */}
           <div className='relative overflow-hidden h-3/4 '>
@@ -390,15 +415,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 1/5 of width - Flight Data */}
-        <div className='flex flex-col w-1/5 h-full border-l border-gray-700 bg-gray-800/90 backdrop-blur-sm'>
+        {/* Right Side - Flight Data */}
+        <div className='flex flex-col w-1/5 h-full border-l border-gray-700 lg:w-1/4 xl:w-1/5 bg-gray-800/90 backdrop-blur-sm'>
 
           {/* Header */}
-          <div className='p-6 border-b border-gray-700'>
-            <div className='flex items-center justify-between mb-4'>
+          <div className='p-4 overflow-y-auto border-b border-gray-700 h-1/3 xl:h-auto'>
+            <div className='flex flex-col items-center justify-between mb-4 xl:flex-row'>
               <img src='/ZEPHIRUS-white.png' className='w-[42px]'/>
-              <h1 className='text-2xl font-bold text-white'>ZEPHIRUS</h1>
-              <div className={`flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r ${
+              <h1 className='text-xl font-bold text-white xl:text-2xl'>ZEPHIRUS</h1>
+              <div className={`ml-1 xl:ml-0 flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r ${
                 serverStatus === "CONNECTED"
                   ? "from-green-500 to-green-600" 
                   : serverStatus === "DISCONNECTED"
@@ -510,14 +535,14 @@ export default function Home() {
             </div>
 
             {/* Quick Status */}
-            <div className='grid grid-cols-3 gap-3'>
+            <div className='grid grid-cols-1 gap-2 xl:grid-cols-3 xl:gap-3'>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>ALTITUDE</p>
-                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? Math.abs(currentData?.altitude - 132).toFixed(1) : Math.abs(displayData?.altitude - 132).toFixed(1)} m</p>
+                <p className='font-bold text-white text-s xl:text-lg'>{!isPlaybackMode ? currentData?.altitude : displayData?.altitude} m</p>
               </div>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>SPEED</p>
-                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? currentData?.groundSpeed : displayData?.groundSpeed} m</p>
+                <p className='font-bold text-white text-s xl:text-lg'>{!isPlaybackMode ? currentData?.groundSpeed : displayData?.groundSpeed} m</p>
               </div>
               <div className={`p-2 text-center rounded-lg ${
                 (isPlaybackMode ? displayData?.signalStrength : currentData?.signalStrength) >= 80
@@ -527,7 +552,7 @@ export default function Home() {
                   : 'bg-gradient-to-r from-red-500 to-red-600'
               }`}>
                 <p className='text-xs text-white'>SIGNAL</p>
-                <p className='text-lg font-bold text-white'>
+                <p className='font-bold text-white text-s xl:text-lg'>
                   {isPlaybackMode ? displayData?.signalStrength : currentData?.signalStrength} %
                 </p>
               </div>
@@ -539,7 +564,7 @@ export default function Home() {
             <p className='pb-4 text-sm font-semibold text-center text-gray-300'>
               FULL DATA
             </p>
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 gap-3 xl:grid-cols-2'>
               
               {/* Telemetry Cards */}
               {[
@@ -553,7 +578,6 @@ export default function Home() {
                 { icon: FaArrowsAltV, label: 'Pitch', value: `${!isPlaybackMode ? currentData?.pitch : displayData?.pitch} °`, color: 'default' },
                 { icon: FaRotate, label: 'Roll', value: `${!isPlaybackMode ? currentData?.roll : displayData?.roll} °`, color: 'default' },
                 { icon: FaLocationArrow, label: 'Heading', value: `${!isPlaybackMode ? currentData?.heading?.toFixed(1) : displayData?.heading?.toFixed(1)} °`, color: 'default' },
-                /* { icon: PiShowerFill, label: 'Humidifier', value: `${(!isPlaybackMode ? currentData?.hum_status : displayData?.hum_status) === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' }, */
                 { icon: PiShowerFill, label: 'Humidifier', value: `${humidifierState === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
                 { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome?.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
               ].map((item, index) => (
@@ -577,13 +601,13 @@ export default function Home() {
             </div>
 
             {/* Coordinate Cards - Updated */}
-            <div className='flex flex-col w-full gap-4 mt-4 border-t border-gray-700 py-7'>
+            <div className='flex flex-col w-full gap-1 mt-4 border-t border-gray-700 xl:gap-3 py-7'>
               <p className='text-sm font-semibold text-center text-gray-300'>
                 COORDINATES
               </p>
-              <div className='grid w-full h-full grid-cols-2 gap-4 '>
+              <div className='grid w-full h-full grid-cols-2 gap-1 xl:gap-3 '>
                 {/* UAV Position (unchanged) */}
-                <div className='flex flex-col justify-center p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                <div className='flex flex-col justify-center p-1 border xl:p-2 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
                   <div className='flex items-center mb-2'>
                     <FaPlaneUp className='w-4 h-4 mr-2 text-blue-400' />
                     <p className='text-sm font-semibold text-gray-300'>UAV Position</p>
@@ -595,8 +619,8 @@ export default function Home() {
                 </div>
 
                 {/* Home Position - Now Editable */}
-                <div className='p-3 border rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
-                  <div className='flex items-center justify-between mb-2'>
+                <div className='p-1 border xl:p-3 rounded-xl bg-gradient-to-r from-gray-700 to-gray-800 backdrop-blur-sm border-gray-600/30'>
+                  <div className='flex flex-col items-center justify-between mb-2 xl:flex-row'>
                     <div className='flex items-center'>
                       <IoHomeSharp className='w-4 h-4 mr-2 text-green-400' />
                       <p className='text-sm font-semibold text-gray-300'>Home Position</p>
