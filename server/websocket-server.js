@@ -122,7 +122,7 @@ function parseTelemetry(packet) {
     roll, 
     heading, 
     lat, 
-    lon, 
+    lng, 
     altitude, 
     satCount, 
     hdop,
@@ -146,12 +146,12 @@ function parseTelemetry(packet) {
     roll: parseFloat(roll),
     heading: parseFloat(heading),
     lat: parseFloat(lat),
-    lon: parseFloat(lon),
+    lng: parseFloat(lng),
     altitude: parseFloat(altitude),
     satelliteCount: parseInt(satCount),
     hdop: parseFloat(hdop),
     groundSpeed: parseFloat(groundSpeed),
-    hum_status: parseInt(hum_status),
+    hum_status: parseInt(hum_status), // No longer 0 and 1, but rather PWM signal 900-1500 ms
     signalStrength: parseInt(rssi)
   };
 }
