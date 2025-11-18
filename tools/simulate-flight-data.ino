@@ -3,16 +3,25 @@
 // Example: <ZEPH>,168293,27.34,91.2,1012.3,0.01,0.02,9.81,0.01,-0.02,0.01,182.4,-7.78945,110.37428,138.2,1
 
 // Adjustable parameters
-#define TRANSMISSION_INTERVAL_MS 500  // (adjust between 200–500 ms for 2–5 Hz)
+// #define TRANSMISSION_INTERVAL_MS 100  // (adjust between 200–500 ms for 2–5 Hz)
 
+const float TRANSMISSION_FREQUENCY_HZ = 5;
+const float TRANSMISSION_INTERVAL_MS = 1/TRANSMISSION_FREQUENCY_HZ * 1000;
 float lat = -7.7657190733;
-float lon = 110.3717138476;
+float lng = 110.3717138476;
 float altitude = 100.0;
 float pitch = 0;
 float roll = 0;
 unsigned long startTime;
-float prevLat, prevLon, currLat, currLon;
+float prevLat, prevLng, currLat, currLng;
 
+// --- Humidifier PWM simulation ---
+int pwmHum = 900;                 // current PWM output (900 LOW, 1500 HIGH)
+bool isHighPhase = false;         // are we currently in HIGH?
+unsigned long highStartTime = 0;  // when HIGH began
+unsigned long highDuration = 0;   // how long the HIGH lasts
+unsigned long lastPulseTime = 0;  // when the last pulse ended
+bool humidifierLogicalState = false;  // ON/OFF based on pulses
 
 void setup() {
   Serial.begin(115200);
@@ -27,6 +36,9 @@ void loop() {
 
   if (now - lastSend >= TRANSMISSION_INTERVAL_MS) {
     lastSend = now;
+
+    // ✅ update PWM simulation
+    simulateHumidifierPWM();
 
     // Generate mock data
     unsigned long timestamp = (now - startTime) / 10;  // 0.1s resolution
@@ -82,7 +94,7 @@ void loop() {
     static float groundSpeed = 0;
 
     if (prevTimestamp != 0) {
-      float distance = haversine(prevLat, prevLon, lat, lon); // meters
+      float distance = haversine(prevLat, prevLng, lat, lng); // meters
       float timeSec = (timestamp - prevTimestamp) / 10.0;     // timestamp is x10 ms
       if (timeSec > 0) {
         groundSpeed = distance / timeSec;
@@ -111,12 +123,13 @@ void loop() {
     packet += "," + String(roll, 2);
     packet += "," + String(heading, 2);
     packet += "," + String(lat, 10);
-    packet += "," + String(lon, 10);
+    packet += "," + String(lng, 10);
     packet += "," + String(altitude, 2);
     packet += "," + String(satCount);
     packet += "," + String(hdop, 1);
     packet += "," + String(groundSpeed, 2);
-    packet += "," + String(piezoStatus);
+    // packet += "," + String(piezoStatus);
+    packet += "," + String(pwmHum);
     packet += "," + String(rssi);
     Serial.println(packet);
     // Serial.print("Packet size: ");
@@ -138,23 +151,57 @@ float randomFloat(float minVal, float maxVal) {
 void simulateGPSMovement() {
   // Store previous BEFORE updating
   prevLat = lat;
-  prevLon = lon;
+  prevLng = lng;
 
   // Simulate forward motion (north-east-ish)
   // + small left/right drift for natural path
   // 1° lat ≈ 111,320 meters → 0.00002° ≈ 2.2 meter
   float step = 0.00002;  // controls flight speed (~2m/s)
   lat += step + randomFloat(-0.000005, 0.000005); // 0.000005 ≈ 0.55 m
-  lon += step * 1.5 + randomFloat(-0.00001, 0.00001); // 0.00001 ≈ 1.1 m
+  lng += step * 1.5 + randomFloat(-0.00001, 0.00001); // 0.00001 ≈ 1.1 m
 }
 
-float haversine(float lat1, float lon1, float lat2, float lon2) {
+float haversine(float lat1, float lng1, float lat2, float lng2) {
   const float R = 6371000.0; // meters
   float dLat = radians(lat2 - lat1);
-  float dLon = radians(lon2 - lon1);
+  float dLng = radians(lng2 - lng1);
   float a = sin(dLat/2)*sin(dLat/2) +
             cos(radians(lat1))*cos(radians(lat2)) *
-            sin(dLon/2)*sin(dLon/2);
+            sin(dLng/2)*sin(dLng/2);
   float c = 2 * atan2(sqrt(a), sqrt(1-a));
   return R * c;
+}
+
+void simulateHumidifierPWM() {
+  unsigned long now = millis();
+
+  // If currently in HIGH phase → check if HIGH duration is finished
+  if (isHighPhase) {
+    if (now - highStartTime >= highDuration) {
+      // HIGH finished → go back to LOW
+      pwmHum = 900;
+      isHighPhase = false;
+      lastPulseTime = now;
+      humidifierLogicalState = !humidifierLogicalState;  // Toggle logical ON/OFF
+    }
+    return;  // stay in HIGH until done
+  }
+
+  // If in LOW phase → decide whether to start a new pulse
+  // Use 30% probability, but only if enough time has passed since last pulse
+  const unsigned long minDelayBetweenPulses = 1500; // prevent too frequent pulses
+
+  if (now - lastPulseTime > minDelayBetweenPulses) {
+    int r = random(0, 100);  // 0–99
+
+    if (r < 30) {  // 30% chance
+      // Start HIGH phase
+      isHighPhase = true;
+      pwmHum = 1500;
+      highStartTime = now;
+
+      // HIGH duration between 500–1000 ms
+      highDuration = random(500, 1001);
+    }
+  }
 }
