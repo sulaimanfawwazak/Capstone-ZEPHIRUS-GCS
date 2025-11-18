@@ -36,15 +36,77 @@ const defaultHomeLocation = {
   lng: 110.3717978432
 };
 
+// Humidifier toggle things
+let lastHumLevel = "LOW";
+let pulseCount = 0; // counts pulses (LOW → HIGH transitions)
+
+// Decode helpers
+function pwmToLevel(pwm) {
+  return pwm >= 1200 ? "HIGH" : "LOW";
+}
+
+function decodeHumidifierState(pwm) {
+  const humLevel = pwmToLevel(pwm);
+
+  // Detect rising edge (LOW → HIGH)
+  if (lastHumLevel === "LOW" && humLevel === "HIGH") {
+    pulseCount++;
+  }
+
+  lastHumLevel = humLevel;
+
+  // Odd pulses = ON, even pulses = OFF
+  return pulseCount % 2 === 1 ? 1 : 0;
+}
+
 export default function Home() {
   const { data: telemetryData, serverStatus, error } = useWebSocket(WS_URL); 
   const [telemetryHistory, setTelemetryHistory] = useState([]);
   const [flightTrail, setFlightTrail] = useState([]);
   const [isFirstData, setIsFirstData] = useState(true);
   const [groundSpeed, setGroundSpeed] = useState(0);
-  const [homeLocation, setHomeLocation]  = useState(defaultHomeLocation);
+  const [homeLocation, setHomeLocation]  = useState(defaultHomeLocation); console.log("homelocation:", homeLocation);
   const [isEditingHome, setIsEditingHome] = useState(false);
   const [tempHomeLocation, setTempHomeLocation] = useState(defaultHomeLocation);
+  const [humidifierState, setHumidifierState] = useState(0);   // NEW ✔️
+
+  // Use real data or fallback to defaults
+  const currentData = telemetryData || {
+    temperature: 20,
+    humidity: 80,
+    altitude: 0,
+    groundSpeed: 0,
+    satelliteCount: 8,
+    hdop: 0.9,
+    signalStrength: 90,
+    pitch: 0,
+    roll: 0,
+    heading: 0,
+    lat: -7.765719073300151,
+    lng: 110.37171384759249,
+    hum_status: 900
+  };
+
+
+  // Add playback functionality
+  const playback = useFlightPlayback();
+
+  // Determine if we're in playback mode or live mode
+  const isPlaybackMode = playback.hasRecording && serverStatus === "OFF";
+  const displayData = isPlaybackMode ? playback.getCurrentFrame() : currentData;
+
+  // Handle recording loaded
+  const handleRecordingLoaded = (data) => {
+    playback.loadRecording(data);
+  };
+
+  // Add exit playback handler
+  const handleExitPlayback = () => {
+    // Stop any ongoing playback
+    playback.stopPlayback();
+    // Clear the playback data - this will make playback.hasRecording = false
+    playback.loadRecording([]);
+  };
 
   // Home Editing utils
   // Initialize editing when component mounts
@@ -82,10 +144,10 @@ export default function Home() {
     }
   }
 
-  const handleLonChange = (e) => {
+  const handleLngChange = (e) => {
     const value = parseFloat(e.target.value);
     if (!isNaN(value)) {
-      setTempHomeLocation(prev => ({ ...prev, lon: value }));
+      setTempHomeLocation(prev => ({ ...prev, lng: value }));
     }
   }
 
@@ -144,18 +206,15 @@ export default function Home() {
           const prevPoint = prev[prev.length - 1];
 
           const distance = calculateDistance(
-            prevPoint.lat, prevPoint.lon,
-            telemetryData.lat, telemetryData.lon
+            prevPoint.lat, prevPoint.lng,
+            telemetryData.lat, telemetryData.lng
           );
 
           const timeDelta = parseFloat((telemetryData.timestamp - prevPoint.timestamp) / 1000); // sec
-          console.log("prev", telemetryData.timestamp);
-          console.log("timeDelta", prevPoint.timestamp);
-          console.log("timeDelta", timeDelta);
           
           if (timeDelta > 0) {
             const speed = distance / timeDelta;
-            console.log("speed", speed);
+            // console.log("speed", speed);
             setGroundSpeed(speed); // ✅ store properly in state
           }
         }
@@ -165,7 +224,7 @@ export default function Home() {
 
       // Update flight trail - keep ALL positions for entire path
       setFlightTrail(prev => {
-        const newPosition = [telemetryData.lat, telemetryData.lon];
+        const newPosition = [telemetryData.lat, telemetryData.lng];
         
         // Only add new position if it's significantly different from last position
         if (prev.length === 0) {
@@ -208,32 +267,35 @@ export default function Home() {
     setFlightTrail([]);
   };
 
-  // Use real data or fallback to defaults
-  const currentData = telemetryData || {
-    temperature: 20,
-    humidity: 80,
-    altitude: 0,
-    groundSpeed: 0,
-    satelliteCount: 8,
-    hdop: 0.9,
-    signalStrength: 90,
-    pitch: 0,
-    roll: 0,
-    heading: 0,
-    lat: -7.765719073300151,
-    lon: 110.37171384759249,
-    hum_status: 0
-  };
+  // Decode humidifier state when new telemetry arrives
+  useEffect(() => {
+    if (!telemetryData || isPlaybackMode) return;
+
+    const pwm = telemetryData.hum_status;
+    const state = decodeHumidifierState(pwm);
+
+    setHumidifierState(state);
+  }, [telemetryData]);
+
+  // Decode during playback mode
+  useEffect(() => {
+    if (!isPlaybackMode || !displayData) return;
+
+    const pwm = displayData.hum_status;
+    const state = decodeHumidifierState(pwm);
+
+    setHumidifierState(state);
+  }, [isPlaybackMode, displayData]);
 
   // Calculate distance to home (simple haversine formula)
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const calculateDistance = (lat1, lng1, lat2, lng2) => {
     const R = 6371000; // Earth's radius in meters
     const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
     const a = 
       Math.sin(dLat/2) * Math.sin(dLat/2) +
       Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
+      Math.sin(dLng/2) * Math.sin(dLng/2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   };
@@ -272,39 +334,19 @@ export default function Home() {
     }
   };
 
-  // Add playback functionality
-  const playback = useFlightPlayback();
-
-  // Determine if we're in playback mode or live mode
-  const isPlaybackMode = playback.hasRecording && serverStatus === "OFF";
-  const displayData = isPlaybackMode ? playback.getCurrentFrame() : currentData;
-
-  // Handle recording loaded
-  const handleRecordingLoaded = (data) => {
-    playback.loadRecording(data);
-  };
-
-  // Add exit playback handler
-  const handleExitPlayback = () => {
-    // Stop any ongoing playback
-    playback.stopPlayback();
-    // Clear the playback data - this will make playback.hasRecording = false
-    playback.loadRecording([]);
-  };
-
   const planeLocation = {
     lat: displayData?.lat || currentData?.lat,
-    lng: displayData?.lon || currentData?.lon
+    lng: displayData?.lng || currentData?.lng
   };
 
   const distanceToHome = !isPlaybackMode 
-    ? calculateDistance(currentData.lat, currentData.lon, homeLocation.lat, homeLocation.lng) 
-    : calculateDistance(displayData?.lat, displayData?.lon, homeLocation.lat, homeLocation.lng);
+    ? calculateDistance(currentData.lat, currentData.lng, homeLocation.lat, homeLocation.lng) 
+    : calculateDistance(displayData?.lat, displayData?.lng, homeLocation.lat, homeLocation.lng);
 
   // Update your Map component to show playback trail
   const playbackTrail = playback.playbackData
     .filter(point => point.recordingTimestamp <= playback.currentTime)
-    .map(point => [point.lat, point.lon]);
+    .map(point => [point.lat, point.lng]);
 
   return (
     <>
@@ -471,7 +513,7 @@ export default function Home() {
             <div className='grid grid-cols-3 gap-3'>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>ALTITUDE</p>
-                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? currentData?.altitude : displayData?.altitude} m</p>
+                <p className='text-lg font-bold text-white'>{!isPlaybackMode ? Math.abs(currentData?.altitude - 132).toFixed(1) : Math.abs(displayData?.altitude - 132).toFixed(1)} m</p>
               </div>
               <div className='p-2 text-center rounded-lg bg-gray-600/50'>
                 <p className='text-xs text-gray-400'>SPEED</p>
@@ -501,7 +543,7 @@ export default function Home() {
               
               {/* Telemetry Cards */}
               {[
-                { icon: TbRulerMeasure2, label: 'Altitude', value: `${!isPlaybackMode ? currentData?.altitude?.toFixed(1) : displayData?.altitude?.toFixed(1)} m`, color: 'default' },
+                { icon: TbRulerMeasure2, label: 'Altitude', value: `${!isPlaybackMode ? Math.abs(currentData?.altitude?.toFixed(1) - 132).toFixed(1) : Math.abs(displayData?.altitude?.toFixed(1) - 132).toFixed(1)} m`, color: 'default' },
                 { icon: FaTemperatureHalf, label: 'Temperature', value: `${!isPlaybackMode ? currentData?.temperature?.toFixed(1) : displayData?.temperature?.toFixed(1)} °C`, color: 'default' },
                 { icon: IoWaterSharp, label: 'Humidity', value: `${!isPlaybackMode ? currentData?.humidity?.toFixed(1) : displayData?.humidity?.toFixed(1)} %`, color: 'default' },
                 { icon: IoIosSpeedometer, label: 'Ground Speed', value: `${!isPlaybackMode ? currentData?.groundSpeed : displayData?.groundSpeed} m/s`, color: 'default' },
@@ -511,7 +553,8 @@ export default function Home() {
                 { icon: FaArrowsAltV, label: 'Pitch', value: `${!isPlaybackMode ? currentData?.pitch : displayData?.pitch} °`, color: 'default' },
                 { icon: FaRotate, label: 'Roll', value: `${!isPlaybackMode ? currentData?.roll : displayData?.roll} °`, color: 'default' },
                 { icon: FaLocationArrow, label: 'Heading', value: `${!isPlaybackMode ? currentData?.heading?.toFixed(1) : displayData?.heading?.toFixed(1)} °`, color: 'default' },
-                { icon: PiShowerFill, label: 'Humidifier', value: `${(!isPlaybackMode ? currentData?.hum_status : displayData?.hum_status) === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
+                /* { icon: PiShowerFill, label: 'Humidifier', value: `${(!isPlaybackMode ? currentData?.hum_status : displayData?.hum_status) === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' }, */
+                { icon: PiShowerFill, label: 'Humidifier', value: `${humidifierState === 1 ? "ON" : "OFF"}`, color: 'system', valueColor: 'text-white' },
                 { icon: RiPinDistanceFill, label: 'Distance to Home', value: `${distanceToHome?.toFixed(1)} m`, color: 'default', valueColor: 'text-white' },
               ].map((item, index) => (
                 <div 
@@ -547,7 +590,7 @@ export default function Home() {
                   </div>
                   <div className='space-y-1'>
                     <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lat?.toFixed(6) : displayData?.lat?.toFixed(6)}</span></p>
-                    <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lon?.toFixed(6) : displayData?.lon?.toFixed(6)}</span></p>
+                    <p className='text-xs text-gray-400'>Lng: <span className='font-mono text-white'>{!isPlaybackMode ? currentData?.lng?.toFixed(6) : displayData?.lng?.toFixed(6)}</span></p>
                   </div>
                 </div>
 
@@ -614,7 +657,7 @@ export default function Home() {
                             type="number"
                             step="any"
                             value={tempHomeLocation.lng}
-                            onChange={handleLonChange}
+                            onChange={handleLngChange}
                             className="w-full p-1 font-mono text-xs text-white bg-gray-600 border border-gray-500 rounded"
                           />
                         </div>
@@ -622,7 +665,7 @@ export default function Home() {
                     ) : (
                       <>
                         <p className='text-xs text-gray-400'>Lat: <span className='font-mono text-white'>{homeLocation.lat.toFixed(6)}</span></p>
-                        <p className='text-xs text-gray-400'>Lon: <span className='font-mono text-white'>{homeLocation.lng.toFixed(6)}</span></p>
+                        <p className='text-xs text-gray-400'>Lng: <span className='font-mono text-white'>{homeLocation.lng.toFixed(6)}</span></p>
                       </>
                     )}
                   </div>
