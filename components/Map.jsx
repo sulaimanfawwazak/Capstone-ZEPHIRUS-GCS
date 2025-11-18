@@ -105,7 +105,7 @@ function PlaneMarker({ planeLocation, planeIcon, heading, followUAV, onFollowTog
           <strong>UAV Position</strong><br />
           Heading: {heading}°<br />
           Lat: {planeLocation.lat}<br />
-          Lon: {planeLocation.lon || planeLocation.lng}<br />
+          Lng: {planeLocation.lng}<br />
           <br />
           <button 
             onClick={onFollowToggle}
@@ -213,7 +213,7 @@ export default function Map({
           <div className="text-center">
             <strong>Home Location</strong><br />
             Lat: {homeLocation.lat}<br />
-            Lon: {homeLocation.lon || homeLocation.lng}<br />
+            Lng: {homeLocation.lng}<br />
           </div>
         </Popup>
       </Marker>
