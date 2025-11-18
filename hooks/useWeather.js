@@ -6,8 +6,8 @@ export function useWeather() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchWeather = useCallback(async (lat, lon) => {
-    if (!lat || !lon) return;
+  const fetchWeather = useCallback(async (lat, lng) => {
+    if (!lat || !lng) return;
     
     setLoading(true);
     setError(null);
@@ -15,7 +15,7 @@ export function useWeather() {
     try {
       const params = new URLSearchParams({
         latitude: lat.toString(),
-        longitude: lon.toString(),
+        longitude: lng.toString(),
         current: "temperature_2m,relative_humidity_2m,rain,wind_speed_10m,wind_direction_10m,weather_code",
         timezone: "auto"
       });
