@@ -14,7 +14,7 @@ RUN_BACKEND=true
 
 if [ "$1" == "--frontend" ]; then
   RUN_BACKEND=false
-elif [ "$1" == "--backend"]; then
+elif [ "$1" == "--backend" ]; then
   RUN_FRONTEND=false
 fi
 
