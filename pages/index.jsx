@@ -77,7 +77,7 @@ export default function Home() {
   const [telemetryHistory, setTelemetryHistory] = useState([]);
   const [flightTrail, setFlightTrail] = useState([]);
   const [isFirstData, setIsFirstData] = useState(true);
-  const [groundSpeed, setGroundSpeed] = useState(0);
+  // const [groundSpeed, setGroundSpeed] = useState(0);
   const [homeLocation, setHomeLocation]  = useState(defaultHomeLocation); console.log("homelocation:", homeLocation);
   const [isEditingHome, setIsEditingHome] = useState(false);
   const [tempHomeLocation, setTempHomeLocation] = useState(defaultHomeLocation);
@@ -214,26 +214,26 @@ export default function Home() {
 
       addDataPoint(telemetryData);
 
-      setTelemetryHistory(prev => {
-        if (prev.length > 0) {
-          const prevPoint = prev[prev.length - 1];
+      // setTelemetryHistory(prev => {
+      //   if (prev.length > 0) {
+      //     const prevPoint = prev[prev.length - 1];
 
-          const distance = calculateDistance(
-            prevPoint.lat, prevPoint.lng,
-            telemetryData.lat, telemetryData.lng
-          );
+      //     const distance = calculateDistance(
+      //       prevPoint.lat, prevPoint.lng,
+      //       telemetryData.lat, telemetryData.lng
+      //     );
 
-          const timeDelta = parseFloat((telemetryData.timestamp - prevPoint.timestamp) / 1000); // sec
+      //     const timeDelta = parseFloat((telemetryData.timestamp - prevPoint.timestamp) / 1000); // sec
           
-          if (timeDelta > 0) {
-            const speed = distance / timeDelta;
-            // console.log("speed", speed);
-            setGroundSpeed(speed); // ✅ store properly in state
-          }
-        }
+      //     if (timeDelta > 0) {
+      //       const speed = distance / timeDelta;
+      //       // console.log("speed", speed);
+      //       setGroundSpeed(speed); // ✅ store properly in state
+      //     }
+      //   }
 
-        return prev; // no change to history here
-      });
+      //   return prev; // no change to history here
+      // });
 
       // Update flight trail - keep ALL positions for entire path
       setFlightTrail(prev => {
